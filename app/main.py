@@ -105,7 +105,13 @@ def build_application() -> Application:
     app.add_handler(CallbackQueryHandler(handle_history_pagination, pattern="^page:his:"))
     app.add_handler(CallbackQueryHandler(handle_callback_query))
 
+    app.add_error_handler(global_error_handler)
+
     return app
+
+
+async def global_error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
+    logger.error(f"Exception while handling an update: {context.error}", exc_info=context.error)
 
 
 async def main() -> None:
