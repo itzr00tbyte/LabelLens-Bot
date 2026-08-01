@@ -189,13 +189,15 @@ async def handle_callback_query(
                     return
                 doc_name = sub.template_id or sub.document_category
                 is_shipping = "shipping_label" in sub.document_category
+                merged = dict(sub.extracted_fields or {})
+                merged.update(sub.corrected_fields or {})
                 text = MessageRenderer.render_final_updated_receipt(
                     document_type=doc_name,
                     confidence=sub.match_confidence,
                     extracted_fields=sub.extracted_fields,
                     corrected_fields=sub.corrected_fields,
                 )
-                kb = get_result_keyboard(submission_id, is_shipping_label=is_shipping)
+                kb = get_result_keyboard(submission_id, available_fields=list(merged.keys()), is_shipping_label=is_shipping)
                 await query.edit_message_text(text, parse_mode="HTML", reply_markup=kb)
 
             elif cb.action == "tpl:choose":

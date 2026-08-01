@@ -121,11 +121,12 @@ async def handle_document_upload(
                     extracted_fields=submission.extracted_fields,
                     corrected_fields=submission.corrected_fields,
                 )
-                kb = get_result_keyboard(submission_id, is_shipping_label=is_shipping)
-
-                # Generate updated receipt image
                 merged = dict(submission.extracted_fields or {})
                 merged.update(submission.corrected_fields or {})
+                avail_fields = list(merged.keys())
+                kb = get_result_keyboard(submission_id, available_fields=avail_fields, is_shipping_label=is_shipping)
+
+                # Generate updated receipt image
                 img = ReceiptImageGenerator.generate_receipt_image(doc_type, merged, is_shipping=is_shipping)
                 img_bytes = ReceiptImageGenerator.get_image_bytes(img, format="PNG")
 

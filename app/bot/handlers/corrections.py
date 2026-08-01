@@ -206,7 +206,7 @@ async def handle_dropdown_option(
             extracted_fields=sub.extracted_fields,
             corrected_fields=sub.corrected_fields,
         )
-        kb = get_result_keyboard(submission_id, is_shipping_label=is_shipping)
+        kb = get_result_keyboard(submission_id, available_fields=list(merged_fields.keys()), is_shipping_label=is_shipping)
 
         # Generate updated receipt image
         img = ReceiptImageGenerator.generate_receipt_image(doc_name, merged_fields, is_shipping=is_shipping)
@@ -279,7 +279,7 @@ async def process_correction_input(
             extracted_fields=sub.extracted_fields,
             corrected_fields=sub.corrected_fields,
         )
-        kb = get_result_keyboard(submission_id, is_shipping_label=is_shipping)
+        kb = get_result_keyboard(submission_id, available_fields=list(merged_fields.keys()), is_shipping_label=is_shipping)
 
         # Generate updated receipt image
         img = ReceiptImageGenerator.generate_receipt_image(doc_name, merged_fields, is_shipping=is_shipping)
