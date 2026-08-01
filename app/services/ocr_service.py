@@ -9,10 +9,46 @@ import pytesseract
 
 from app.config import settings
 
+import os
+import sys
+
 logger = logging.getLogger(__name__)
 
-if settings.TESSERACT_CMD:
-    pytesseract.pytesseract.tesseract_cmd = settings.TESSERACT_CMD
+
+def _autodetect_tesseract() -> Optional[str]:
+    # 1. Use explicitly configured TESSERACT_CMD if valid
+    if settings.TESSERACT_CMD and os.path.exists(settings.TESSERACT_CMD):
+        return settings.TESSERACT_CMD
+
+    # 2. Windows RDP standard paths
+    if sys.platform == "win32":
+        possible_win_paths = [
+            r"C:\Program Files\Tesseract-OCR\tesseract.exe",
+            r"C:\Program Files (x86)\Tesseract-OCR\tesseract.exe",
+            os.path.expandvars(r"%LOCALAPPDATA%\Programs\Tesseract-OCR\tesseract.exe"),
+            os.path.expandvars(r"%USERPROFILE%\AppData\Local\Programs\Tesseract-OCR\tesseract.exe"),
+        ]
+        for p in possible_win_paths:
+            if os.path.exists(p):
+                logger.info(f"Auto-detected Windows Tesseract executable at: {p}")
+                return p
+
+    # 3. macOS / Linux standard paths
+    possible_unix_paths = [
+        "/opt/homebrew/bin/tesseract",
+        "/usr/local/bin/tesseract",
+        "/usr/bin/tesseract",
+    ]
+    for p in possible_unix_paths:
+        if os.path.exists(p):
+            return p
+
+    return settings.TESSERACT_CMD
+
+
+tesseract_path = _autodetect_tesseract()
+if tesseract_path:
+    pytesseract.pytesseract.tesseract_cmd = tesseract_path
 
 
 @dataclass
