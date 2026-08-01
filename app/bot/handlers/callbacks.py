@@ -115,7 +115,9 @@ async def handle_callback_query(
                     corrected_fields=sub.corrected_fields,
                 )
                 is_shipping = "shipping_label" in sub.document_category
-                kb = get_result_keyboard(submission_id, is_shipping_label=is_shipping)
+                merged = dict(sub.extracted_fields or {})
+                merged.update(sub.corrected_fields or {})
+                kb = get_result_keyboard(submission_id, available_fields=list(merged.keys()), is_shipping_label=is_shipping)
                 await query.edit_message_text(text, parse_mode="HTML", reply_markup=kb)
 
             elif cb.action == "doc:trk":
@@ -129,7 +131,9 @@ async def handle_callback_query(
                 service_name = fields.get("service", "Standard")
                 text = MessageRenderer.render_tracking_details(trk_no, carrier, service_name)
                 is_shipping = "shipping_label" in sub.document_category
-                kb = get_result_keyboard(submission_id, is_shipping_label=is_shipping)
+                merged = dict(sub.extracted_fields or {})
+                merged.update(sub.corrected_fields or {})
+                kb = get_result_keyboard(submission_id, available_fields=list(merged.keys()), is_shipping_label=is_shipping)
                 await query.edit_message_text(text, parse_mode="HTML", reply_markup=kb)
 
             elif cb.action == "doc:down_img":
