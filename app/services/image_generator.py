@@ -181,19 +181,19 @@ class ReceiptImageGenerator:
     @staticmethod
     def _draw_usps_label(draw: ImageDraw.ImageDraw, width: int, height: int, fields: Dict[str, Any], doc_type: str) -> None:
         # Fonts matching official USPS label
-        font_huge = _load_font(72, bold=True)
-        font_title = _load_font(24, bold=True)
-        font_header = _load_font(20, bold=True)
+        font_huge = _load_font(84, bold=True)
+        font_title = _load_font(24, bold=False)  # Regular weight for USPS GROUND ADVANTAGE
+        font_header = _load_font(22, bold=True)
         font_body_bold = _load_font(15, bold=True)
         font_body = _load_font(14, bold=False)
-        font_small = _load_font(11, bold=False)
-        font_tracking = _load_font(20, bold=True)
+        font_small = _load_font(12, bold=False)
+        font_tracking = _load_font(22, bold=True)
 
-        # 1. Outer Border Box
-        draw.rectangle([10, 10, width - 10, height - 10], outline=(0, 0, 0), width=3)
+        # 1. Outer Border Box at page edge (No 10px outer white margin gap)
+        draw.rectangle([2, 2, width - 2, height - 2], outline=(0, 0, 0), width=2)
 
-        # 2. Top Header Block (y: 10 to 145)
-        draw.line([135, 10, 135, 145], fill=(0, 0, 0), width=2)
+        # 2. Top Header Block (y: 2 to 145)
+        draw.line([135, 2, 135, 145], fill=(0, 0, 0), width=2)
         service_name = str(fields.get("service") or fields.get("service_type") or "GROUND ADVANTAGE").upper()
 
         badge_letter = "G"
@@ -204,27 +204,28 @@ class ReceiptImageGenerator:
         elif "ups" in str(fields.get("carrier")).lower():
             badge_letter = "U"
 
-        draw.text((72, 75), badge_letter, fill=(0, 0, 0), font=font_huge, anchor="mm")
+        # Large G dominating left header cell
+        draw.text((68, 70), badge_letter, fill=(0, 0, 0), font=font_huge, anchor="mm")
 
         # Top Middle: Authentic QR Code + Pickup text
-        _draw_real_qr_code(draw, 150, 22, size=75, seed=101)
+        _draw_real_qr_code(draw, 148, 20, size=85, seed=101)
         header_text = "Scan for Free\nPackage Pickup\nor to Find a\nPost Office"
-        draw.text((238, 25), header_text, fill=(0, 0, 0), font=font_small, spacing=3)
+        draw.text((248, 25), header_text, fill=(0, 0, 0), font=font_small, spacing=4)
 
         # Top Right: Postage Box
-        draw.line([450, 10, 450, 145], fill=(0, 0, 0), width=2)
-        draw.rectangle([458, 18, 582, 95], outline=(0, 0, 0), width=1)
+        draw.line([450, 2, 450, 145], fill=(0, 0, 0), width=2)
+        draw.rectangle([458, 14, 586, 95], outline=(0, 0, 0), width=1)
         postage_text = "NO POSTAGE\nNECESSARY IF\nMAILED IN THE\nUNITED STATES"
-        draw.text((520, 56), postage_text, fill=(0, 0, 0), font=font_small, anchor="mm", align="center", spacing=2)
+        draw.text((522, 54), postage_text, fill=(0, 0, 0), font=font_small, anchor="mm", align="center", spacing=2)
 
         # 3. Service Title Banner (y: 145 to 195)
-        draw.line([10, 145, width - 10, 145], fill=(0, 0, 0), width=3)
+        draw.line([2, 145, width - 2, 145], fill=(0, 0, 0), width=3)
         carrier_name = str(fields.get("carrier") or "USPS").upper()
         banner_title = f"{carrier_name} {service_name}"
         draw.text((width // 2, 170), banner_title, fill=(0, 0, 0), font=font_title, anchor="mm")
-        draw.line([10, 195, width - 10, 195], fill=(0, 0, 0), width=3)
+        draw.line([2, 195, width - 2, 195], fill=(0, 0, 0), width=3)
 
-        # 4. Ship From & Info Block (y: 195 to 370)
+        # 4. Central Panel (Sender & Recipient - NO extra horizontal divider line at y=370!)
         sender_val = str(fields.get("sender_address") or fields.get("ship_from") or fields.get("sender_name") or "ALBERT OSBORN\n421 SUNNY MAGNOLIA ROW\nCOMMERCE CITY CO 80229")
         sender_lines = [l.strip().upper() for l in sender_val.split("\n") if l.strip()]
         if len(sender_lines) == 1:
@@ -233,54 +234,65 @@ class ReceiptImageGenerator:
         y_send = 210
         for line in sender_lines[:3]:
             draw.text((25, y_send), line, fill=(0, 0, 0), font=font_body)
-            y_send += 20
+            y_send += 22
 
         # Right side reference 0001 & R004 box
         draw.text((570, 220), "0001", fill=(0, 0, 0), font=font_header, anchor="ra")
         draw.rectangle([460, 260, 545, 305], outline=(0, 0, 0), width=1)
-        draw.text((502, 282), "R004", fill=(0, 0, 0), font=font_body_bold, anchor="mm")
+        draw.text((502, 282), "R004", fill=(0, 0, 0), font=font_body, anchor="mm")
 
-        # 5. Ship To & DataMatrix Block (y: 370 to 600)
-        draw.line([10, 370, width - 10, 370], fill=(0, 0, 0), width=3)
-
+        # Recipient Block (Lower part of Central Panel)
         # Left side 2D DataMatrix barcode
         _draw_datamatrix_code(draw, 25, 430, size=75, seed=202)
 
-        # Clean Recipient SHIP TO block
-        raw_recip = str(fields.get("recipient_address") or fields.get("address") or fields.get("ship_to") or fields.get("recipient_name") or "FOOD LION\n1410 RIVER RIDGE DR\nCLEMMONS NC 27012-8355")
-        
-        # Clean any stray tracking text
-        cleaned_recip = raw_recip.replace("USPS TRACKING #", "").replace("USPS TRACKING", "").replace("SHIP TO:", "").strip()
+        # Parse Recipient Info correctly (FOOD LION on line 1, 1410 RIVER RIDGE DR on line 2, etc.)
+        recip_name = str(fields.get("recipient_name") or "").strip().upper()
+        recip_addr_raw = str(fields.get("recipient_address") or fields.get("address") or fields.get("ship_to") or "").strip()
+
+        # Clean any stray tokens
+        cleaned_recip = recip_addr_raw.replace("USPS TRACKING #", "").replace("USPS TRACKING", "").replace("SHIP TO:", "").strip()
         recip_lines = [l.strip().upper() for l in cleaned_recip.split("\n") if l.strip()]
-        if len(recip_lines) == 1:
-            recip_lines = [l.strip().upper() for l in cleaned_recip.split(",") if l.strip()]
+
+        if not recip_name:
+            if recip_lines:
+                # If first line looks like a recipient name (e.g. FOOD LION)
+                if not any(char.isdigit() for char in recip_lines[0]):
+                    recip_name = recip_lines[0]
+                    recip_lines = recip_lines[1:]
+                else:
+                    recip_name = "FOOD LION"
+            else:
+                recip_name = "FOOD LION"
+
+        if not recip_lines:
+            recip_lines = ["1410 RIVER RIDGE DR", "CLEMMONS NC 27012-8355"]
 
         draw.text((120, 415), "SHIP TO:", fill=(0, 0, 0), font=font_body_bold)
 
-        y_recip = 415
-        if recip_lines:
-            # First line next to SHIP TO:
-            draw.text((205, y_recip), recip_lines[0], fill=(0, 0, 0), font=font_body_bold)
-            y_recip += 28
-            for line in recip_lines[1:]:
-                draw.text((205, y_recip), line, fill=(0, 0, 0), font=font_body_bold)
-                y_recip += 26
+        # Recipient Name next to SHIP TO:
+        draw.text((205, 415), recip_name, fill=(0, 0, 0), font=font_body_bold)
 
-        # 6. Tracking Section (y: 600 to 830)
-        draw.line([10, 600, width - 10, 600], fill=(0, 0, 0), width=3)
+        # Recipient Address Lines below
+        y_recip = 443
+        for line in recip_lines:
+            draw.text((205, y_recip), line, fill=(0, 0, 0), font=font_body_bold)
+            y_recip += 28
+
+        # 5. Tracking Section (y: 600 to 830)
+        draw.line([2, 600, width - 2, 600], fill=(0, 0, 0), width=3)
         draw.text((width // 2, 622), f"{carrier_name} TRACKING #", fill=(0, 0, 0), font=font_header, anchor="mm")
 
         # Code 128 Barcode
         raw_trk = str(fields.get("tracking_number") or "9748577400768408852981")
-        _draw_code128_barcode(draw, 65, 650, width=470, height=118, code_str=raw_trk)
+        _draw_code128_barcode(draw, 65, 650, width=470, height=120, code_str=raw_trk)
 
         # Formatted 4-digit Spaced Tracking Number
         formatted_trk = _format_tracking_number(raw_trk)
         draw.text((width // 2, 792), formatted_trk, fill=(0, 0, 0), font=font_tracking, anchor="mm")
 
-        # 7. Bottom Barcode & Footer (y: 830 to 890)
-        draw.line([10, 830, width - 10, 830], fill=(0, 0, 0), width=3)
-        _draw_datamatrix_code(draw, 525, 838, size=48, seed=303)
+        # 6. Bottom Barcode & Footer (y: 830 to 898)
+        draw.line([2, 830, width - 2, 830], fill=(0, 0, 0), width=3)
+        _draw_datamatrix_code(draw, 525, 838, size=52, seed=303)
 
     @staticmethod
     def _draw_store_receipt(draw: ImageDraw.ImageDraw, width: int, height: int, fields: Dict[str, Any], doc_type: str) -> None:
