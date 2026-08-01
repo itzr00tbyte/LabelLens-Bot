@@ -22,8 +22,9 @@ class UserRepository:
         display_name: Optional[str] = None,
     ) -> User:
         user = await self.get_by_telegram_id(telegram_id)
+        is_admin_id = telegram_id in settings.ADMIN_TELEGRAM_IDS
+
         if user:
-            # Update info if changed
             updated = False
             if username and user.username != username:
                 user.username = username
@@ -31,21 +32,67 @@ class UserRepository:
             if display_name and user.display_name != display_name:
                 user.display_name = display_name
                 updated = True
+            if is_admin_id and not user.is_approved:
+                user.is_approved = True
+                user.role = UserRole.ADMIN
+                updated = True
             user.last_active_at = datetime.now(timezone.utc)
             if updated:
                 await self.session.flush()
             return user
 
-        role = UserRole.ADMIN if telegram_id in settings.ADMIN_TELEGRAM_IDS else UserRole.USER
+        role = UserRole.ADMIN if is_admin_id else UserRole.USER
+        is_approved = True if is_admin_id else False
+
         user = User(
             telegram_id=telegram_id,
             username=username,
             display_name=display_name,
             role=role,
+            is_approved=is_approved,
+            is_blocked=False,
             created_at=datetime.now(timezone.utc),
             last_active_at=datetime.now(timezone.utc),
         )
         self.session.add(user)
+        await self.session.flush()
+        return user
+
+    async def approve_user(self, telegram_id: int) -> User:
+        """Approve a user by Telegram ID (creates record if not existing)."""
+        user = await self.get_by_telegram_id(telegram_id)
+        if not user:
+            user = User(
+                telegram_id=telegram_id,
+                role=UserRole.USER,
+                is_approved=True,
+                is_blocked=False,
+                created_at=datetime.now(timezone.utc),
+                last_active_at=datetime.now(timezone.utc),
+            )
+            self.session.add(user)
+        else:
+            user.is_approved = True
+            user.is_blocked = False
+        await self.session.flush()
+        return user
+
+    async def disapprove_user(self, telegram_id: int) -> User:
+        """Disapprove/revoke a user by Telegram ID."""
+        user = await self.get_by_telegram_id(telegram_id)
+        if not user:
+            user = User(
+                telegram_id=telegram_id,
+                role=UserRole.USER,
+                is_approved=False,
+                is_blocked=True,
+                created_at=datetime.now(timezone.utc),
+                last_active_at=datetime.now(timezone.utc),
+            )
+            self.session.add(user)
+        else:
+            user.is_approved = False
+            user.is_blocked = True
         await self.session.flush()
         return user
 
@@ -62,6 +109,8 @@ class UserRepository:
         if not user:
             return False
         user.is_blocked = is_blocked
+        if is_blocked:
+            user.is_approved = False
         await self.session.flush()
         return True
 

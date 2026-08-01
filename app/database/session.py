@@ -35,6 +35,12 @@ AsyncSessionLocal = async_sessionmaker(
 async def init_db() -> None:
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        # Handle auto-migration for existing SQLite tables
+        try:
+            from sqlalchemy import text
+            await conn.execute(text("ALTER TABLE users ADD COLUMN is_approved BOOLEAN DEFAULT 0"))
+        except Exception:
+            pass
 
 
 @asynccontextmanager

@@ -91,7 +91,8 @@ class OCRService:
         try:
             # Custom config for better character recognition
             custom_config = r"--oem 3 --psm 6"
-            text = pytesseract.image_to_string(image, config=custom_config)
+            raw_text = pytesseract.image_to_string(image, config=custom_config)
+            text = raw_text if isinstance(raw_text, str) else str(raw_text)
             
             data = pytesseract.image_to_data(
                 image, config=custom_config, output_type=pytesseract.Output.DICT

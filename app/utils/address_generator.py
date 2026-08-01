@@ -1,6 +1,5 @@
 import random
 import re
-from typing import Tuple
 
 ZIP_CITY_STATE_MAP = {
     "90210": ("Beverly Hills", "CA"),

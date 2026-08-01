@@ -1,7 +1,7 @@
 import os
 import secrets
 import tempfile
-from typing import Tuple
+from typing import Tuple, Union
 
 from app.config import settings
 
@@ -16,7 +16,7 @@ class FileValidator:
     }
 
     @classmethod
-    def validate_file_bytes(cls, file_bytes: bytes, filename: str = "") -> Tuple[bool, str]:
+    def validate_file_bytes(cls, file_bytes: Union[bytes, bytearray], filename: str = "") -> Tuple[bool, str]:
         if not file_bytes:
             return False, "File is empty."
 
@@ -39,7 +39,7 @@ class FileValidator:
         return True, matched_ext
 
     @staticmethod
-    def create_safe_temp_file(file_bytes: bytes, ext: str) -> str:
+    def create_safe_temp_file(file_bytes: Union[bytes, bytearray], ext: str) -> str:
         temp_dir = tempfile.gettempdir()
         safe_name = f"doc_{secrets.token_hex(12)}.{ext}"
         filepath = os.path.join(temp_dir, safe_name)

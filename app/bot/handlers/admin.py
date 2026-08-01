@@ -1,137 +1,115 @@
-import csv
-from io import StringIO
 import logging
 from telegram import Update
 from telegram.ext import ContextTypes
 
-from app.bot.keyboards.admin import get_admin_dashboard_keyboard
 from app.bot.middleware.access_control import ensure_user
-from app.database.repositories import SubmissionRepository, TemplateRepository
+from app.database.repositories import UserRepository
 from app.database.session import get_db_session
-from app.templates.loader import default_template_loader
-from app.utils.callback_data import CallbackDataHelper
 
 logger = logging.getLogger(__name__)
 
 
-async def admin_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def approve_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Admin command: /approve <telegram_id>"""
     allowed, is_admin, tg_id = await ensure_user(update)
     if not allowed or not is_admin:
         if update.message:
-            await update.message.reply_text("⛔ Unauthorized: Admin access required.")
+            await update.message.reply_html("⛔ <b>Unauthorized:</b> Admin access required.")
         return
 
-    text = "🔐 <b>Admin Dashboard</b>\n\nSelect an administrative action from below:"
-    kb = get_admin_dashboard_keyboard()
-    if update.message:
-        await update.message.reply_html(text, reply_markup=kb)
-
-
-async def handle_admin_callback(
-    update: Update, context: ContextTypes.DEFAULT_TYPE
-) -> None:
-    query = update.callback_query
-    if not query or not query.data:
+    if not context.args or not context.args[0].isdigit():
+        if update.message:
+            await update.message.reply_html(
+                "💡 <b>Usage:</b> <code>/approve &lt;telegram_id&gt;</code>\n"
+                "Example: <code>/approve 123456789</code>"
+            )
         return
 
-    allowed, is_admin, tg_id = await ensure_user(update)
-    if not allowed or not is_admin:
-        await query.answer("⛔ Admin access required.", show_alert=True)
-        return
-
-    await query.answer()
-    cb = CallbackDataHelper.decode(query.data)
+    target_id = int(context.args[0])
 
     async with get_db_session() as session:
-        sub_repo = SubmissionRepository(session)
-        tpl_repo = TemplateRepository(session)
+        repo = UserRepository(session)
+        user = await repo.approve_user(target_id)
 
-        if cb.action == "menu:admin":
-            text = "🔐 <b>Admin Dashboard</b>\n\nSelect an administrative action from below:"
-            await query.edit_message_text(
-                text, parse_mode="HTML", reply_markup=get_admin_dashboard_keyboard()
+    logger.info("Admin %s approved user %s", tg_id, target_id)
+    if update.message:
+        await update.message.reply_html(
+            f"✅ <b>User Approved!</b>\n\n"
+            f"  🆔  <b>Telegram ID:</b> <code>{target_id}</code>\n"
+            f"  👤  <b>Name:</b> {user.display_name or 'N/A'}\n"
+            f"  🏷️  <b>Status:</b> Approved & Allowed"
+        )
+
+
+async def disapprove_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Admin command: /disapprove <telegram_id> or /revoke <telegram_id>"""
+    allowed, is_admin, tg_id = await ensure_user(update)
+    if not allowed or not is_admin:
+        if update.message:
+            await update.message.reply_html("⛔ <b>Unauthorized:</b> Admin access required.")
+        return
+
+    if not context.args or not context.args[0].isdigit():
+        if update.message:
+            await update.message.reply_html(
+                "💡 <b>Usage:</b> <code>/disapprove &lt;telegram_id&gt;</code>\n"
+                "Example: <code>/disapprove 123456789</code>"
             )
+        return
 
-        elif cb.action == "adm:stats":
-            stats = await sub_repo.get_stats()
-            text = (
-                "📊 <b>Processing Statistics</b>\n\n"
-                f"• <b>Total Submissions:</b> {stats['total']}\n"
-                f"• <b>Approved:</b> {stats['approved']}\n"
-                f"• <b>Rejected:</b> {stats['rejected']}\n"
-                f"• <b>Failed:</b> {stats['failed']}\n"
-                f"• <b>Pending Review:</b> {stats['pending']}\n"
-            )
-            await query.edit_message_text(
-                text, parse_mode="HTML", reply_markup=get_admin_dashboard_keyboard()
-            )
+    target_id = int(context.args[0])
 
-        elif cb.action == "adm:tpl":
-            templates = default_template_loader.list_templates()
-            lines = ["🧩 <b>Loaded Document Templates</b>\n"]
-            for tpl in templates:
-                status_icon = "🟢" if tpl.enabled else "🔴"
-                lines.append(
-                    f"{status_icon} <b>{tpl.name}</b> (<code>{tpl.id}</code>)\n"
-                    f"Priority: {tpl.priority} | Min Score: {tpl.minimum_score}"
-                )
-            await query.edit_message_text(
-                "\n".join(lines),
-                parse_mode="HTML",
-                reply_markup=get_admin_dashboard_keyboard(),
-            )
+    async with get_db_session() as session:
+        repo = UserRepository(session)
+        user = await repo.disapprove_user(target_id)
 
-        elif cb.action == "adm:failed":
-            failed_items = await sub_repo.get_failed_or_low_confidence(limit=5)
-            if not failed_items:
-                await query.edit_message_text(
-                    "⚠️ <b>Failed / Low-Confidence Scans</b>\n\nNo failed or low-confidence scans found.",
-                    parse_mode="HTML",
-                    reply_markup=get_admin_dashboard_keyboard(),
-                )
-                return
+    logger.info("Admin %s disapproved user %s", tg_id, target_id)
+    if update.message:
+        await update.message.reply_html(
+            f"🚫 <b>User Disapproved!</b>\n\n"
+            f"  🆔  <b>Telegram ID:</b> <code>{target_id}</code>\n"
+            f"  👤  <b>Name:</b> {user.display_name or 'N/A'}\n"
+            f"  🏷️  <b>Status:</b> Revoked & Disapproved"
+        )
 
-            lines = ["⚠️ <b>Recent Failed / Low-Confidence Scans</b>\n"]
-            for item in failed_items:
-                lines.append(
-                    f"• <code>{item.id[:8]}</code> | Category: {item.document_category} | "
-                    f"Conf: {int(item.match_confidence * 100)}% | Status: {item.status.value}"
-                )
-            await query.edit_message_text(
-                "\n".join(lines),
-                parse_mode="HTML",
-                reply_markup=get_admin_dashboard_keyboard(),
-            )
 
-        elif cb.action == "adm:export":
-            approved_subs = await sub_repo.get_all_approved(limit=500)
-            if not approved_subs:
-                await query.edit_message_text(
-                    "📤 <b>Export CSV</b>\n\nNo approved records found to export.",
-                    parse_mode="HTML",
-                    reply_markup=get_admin_dashboard_keyboard(),
-                )
-                return
+async def users_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Admin command: /users - Lists registered users and approval status"""
+    allowed, is_admin, tg_id = await ensure_user(update)
+    if not allowed or not is_admin:
+        if update.message:
+            await update.message.reply_html("⛔ <b>Unauthorized:</b> Admin access required.")
+        return
 
-            s = StringIO()
-            writer = csv.writer(s)
-            writer.writerow([
-                "SubmissionID", "UserID", "Category", "TemplateID",
-                "Confidence", "ApprovedAt", "ExtractedFields"
-            ])
-            for sub in approved_subs:
-                writer.writerow([
-                    sub.id, sub.user_id, sub.document_category, sub.template_id,
-                    sub.match_confidence, sub.approved_at, str(sub.corrected_fields or sub.extracted_fields)
-                ])
+    async with get_db_session() as session:
+        repo = UserRepository(session)
+        users = await repo.list_users(limit=50)
 
-            csv_bytes = s.getvalue().encode("utf-8")
-            s.close()
+    if not users:
+        if update.message:
+            await update.message.reply_html("📋 <b>User List</b>\n\nNo registered users found.")
+        return
 
-            if update.effective_chat:
-                await context.bot.send_document(
-                    chat_id=update.effective_chat.id,
-                    document=csv_bytes,
-                    filename="approved_submissions_export.csv",
-                    caption="📤 Approved Submissions Export",
-                )
+    lines = [
+        "╭──────── 📋 <b>User Directory</b> ────────╮",
+        "",
+        f"  Total Users: <b>{len(users)}</b>",
+        "",
+    ]
+
+    for user in users:
+        if user.role.value == "admin":
+            badge = "👑 Admin"
+        elif user.is_approved:
+            badge = "✅ Approved"
+        else:
+            badge = "⏳ Pending/Disapproved"
+
+        name_str = f" ({user.display_name})" if user.display_name else ""
+        lines.append(f"  • <code>{user.telegram_id}</code>{name_str} — {badge}")
+
+    lines.append("")
+    lines.append("╰──────────────────────────────────╯")
+
+    if update.message:
+        await update.message.reply_html("\n".join(lines))

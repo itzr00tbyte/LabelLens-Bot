@@ -63,6 +63,7 @@ class User(Base):
     role: Mapped[UserRole] = mapped_column(
         SQLEnum(UserRole, native_enum=False), default=UserRole.USER, nullable=False
     )
+    is_approved: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     is_blocked: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
     last_active_at: Mapped[datetime] = mapped_column(

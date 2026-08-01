@@ -1,9 +1,8 @@
 from datetime import datetime, timezone
 import hashlib
 import logging
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Optional, Tuple
 
-from PIL import Image
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings

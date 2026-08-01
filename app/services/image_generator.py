@@ -2,11 +2,12 @@ import io
 import os
 import random
 import sys
-from typing import Any, Dict
+from typing import Any, Dict, Union
 from PIL import Image, ImageDraw, ImageFont
+from PIL.ImageFont import FreeTypeFont
 
 
-def _load_font(size: int, bold: bool = False) -> ImageFont.ImageFont:
+def _load_font(size: int, bold: bool = False) -> Union[ImageFont.ImageFont, FreeTypeFont]:
     """Loads a clean sans-serif font across macOS, Windows, and Linux."""
     possible_paths = []
     if sys.platform == "win32":
@@ -108,7 +109,7 @@ def _draw_datamatrix_code(draw: ImageDraw.ImageDraw, x: int, y: int, size: int, 
 
 def _draw_code128_barcode(draw: ImageDraw.ImageDraw, x: int, y: int, width: int, height: int, code_str: str) -> None:
     """Draws a clean, high-density Code 128 barcode pattern."""
-    digits = "".join(c for c in str(code_str) if c.isdigit()) or "9748577400768408852981"
+    digits = "".join(c for c in code_str if c.isdigit()) or "9748577400768408852981"
     rnd = random.Random(int(digits[:8]))
 
     curr_x = x
@@ -140,7 +141,7 @@ def _draw_code128_barcode(draw: ImageDraw.ImageDraw, x: int, y: int, width: int,
 
 def _format_tracking_number(trk_raw: str) -> str:
     """Formats tracking digits into 4-digit spaced groups."""
-    digits = "".join(c for c in str(trk_raw) if c.isdigit())
+    digits = "".join(c for c in trk_raw if c.isdigit())
     if not digits:
         return "9748 5774 0076 8408 8529 81"
     chunks = [digits[i:i+4] for i in range(0, len(digits), 4)]
@@ -164,7 +165,7 @@ class ReceiptImageGenerator:
         image = Image.new("RGB", (width, height), (255, 255, 255))
         draw = ImageDraw.Draw(image)
 
-        doc_lower = str(document_type).lower()
+        doc_lower = document_type.lower()
         if is_shipping or "shipping" in doc_lower or "usps" in doc_lower or "ups" in doc_lower or "fedex" in doc_lower:
             ReceiptImageGenerator._draw_usps_label(draw, width, height, fields, document_type)
         else:

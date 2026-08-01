@@ -1,11 +1,9 @@
 import io
 import logging
-import os
 from telegram import Update
 from telegram.ext import ContextTypes
 
 from app.bot.keyboards.result import (
-    get_low_confidence_keyboard,
     get_result_keyboard,
     get_unknown_document_keyboard,
 )
@@ -14,11 +12,11 @@ from app.bot.middleware.access_control import ensure_user
 from app.bot.middleware.rate_limit import global_rate_limiter
 from app.config import settings
 from app.database.repositories import SubmissionRepository, UserRepository
+import secrets
 from app.database.session import get_db_session
 from app.services.image_generator import ReceiptImageGenerator
 from app.services.submission_service import SubmissionService
 from app.utils.file_validation import FileValidator
-from app.utils.identifiers import generate_error_reference
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +26,8 @@ async def handle_document_upload(
 ) -> None:
     allowed, is_admin, tg_id = await ensure_user(update)
     if not allowed or not tg_id or not update.message:
+        if update.message:
+            await update.message.reply_html(render_access_denied_message(tg_id))
         return
 
     if global_rate_limiter.is_rate_limited(tg_id):
@@ -45,8 +45,15 @@ async def handle_document_upload(
         )
         return
 
+    # Trigger native Telegram header typing animation
+    if update.effective_chat:
+        try:
+            await context.bot.send_chat_action(chat_id=update.effective_chat.id, action="typing")
+        except Exception:
+            pass
+
     status_msg = await update.message.reply_html(
-        MessageRenderer.render_processing_stage("📥 Receiving document...")
+        MessageRenderer.render_processing_stage_1()
     )
 
     file_obj = None
@@ -58,6 +65,10 @@ async def handle_document_upload(
         elif document:
             file_obj = await context.bot.get_file(document.file_id)
             original_filename = document.file_name or "document.bin"
+
+        if not file_obj:
+            await status_msg.edit_text("❌ Failed to download file from Telegram.")
+            return
 
         file_bytes = await file_obj.download_as_bytearray()
         
@@ -85,13 +96,25 @@ async def handle_document_upload(
             submission_id = submission.id
             await session.commit()
 
-        # Define stage update helper for continuous message edits
+        # Map stage text keywords → animated renderer stages
+        _stage_renderers = {
+            "ocr": MessageRenderer.render_processing_stage_2,
+            "match": MessageRenderer.render_processing_stage_3,
+            "templ": MessageRenderer.render_processing_stage_3,
+            "finaliz": MessageRenderer.render_processing_stage_4,
+            "generat": MessageRenderer.render_processing_stage_4,
+        }
+
         async def stage_callback(stage_text: str):
             try:
-                await status_msg.edit_text(
-                    MessageRenderer.render_processing_stage(stage_text),
-                    parse_mode="HTML"
-                )
+                renderer = None
+                lower = stage_text.lower()
+                for keyword, fn in _stage_renderers.items():
+                    if keyword in lower:
+                        renderer = fn
+                        break
+                html = renderer() if renderer else MessageRenderer.render_processing_stage(stage_text, step=4)
+                await status_msg.edit_text(html, parse_mode="HTML")
             except Exception:
                 pass
 
@@ -134,6 +157,13 @@ async def handle_document_upload(
                         await status_msg.delete()
                     except Exception:
                         pass
+                    # Trigger native Telegram photo uploading indicator
+                    try:
+                        await context.bot.send_chat_action(
+                            chat_id=update.effective_chat.id, action="upload_photo"
+                        )
+                    except Exception:
+                        pass
                     await context.bot.send_photo(
                         chat_id=update.effective_chat.id,
                         photo=io.BytesIO(img_bytes),
@@ -148,7 +178,7 @@ async def handle_document_upload(
 
     except Exception as e:
         logger.error(f"Error handling upload for user {tg_id}: {e}", exc_info=True)
-        ref_id = generate_error_reference()
+        ref_id = f"ERR-{secrets.token_hex(3).upper()}"
         err_html = MessageRenderer.render_error_message(ref_id)
         try:
             await status_msg.edit_text(err_html, parse_mode="HTML")

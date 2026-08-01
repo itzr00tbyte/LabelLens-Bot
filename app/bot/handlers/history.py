@@ -2,9 +2,8 @@ import logging
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import ContextTypes
 
-from app.bot.keyboards.main_menu import get_main_menu_keyboard
 from app.bot.messages.renderers import MessageRenderer
-from app.bot.middleware.access_control import ensure_user
+from app.bot.middleware.access_control import ensure_user, render_access_denied_message
 from app.database.repositories import SubmissionRepository, UserRepository
 from app.database.session import get_db_session
 from app.utils.callback_data import CallbackDataHelper
@@ -15,6 +14,8 @@ logger = logging.getLogger(__name__)
 async def history_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     allowed, is_admin, tg_id = await ensure_user(update)
     if not allowed or not tg_id:
+        if update.message:
+            await update.message.reply_html(render_access_denied_message(tg_id))
         return
 
     await render_history_page(update, context, page=0, is_admin=is_admin, tg_id=tg_id)

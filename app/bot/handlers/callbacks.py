@@ -6,7 +6,6 @@ from telegram.ext import ContextTypes
 from app.bot.keyboards.main_menu import get_main_menu_keyboard
 from app.bot.keyboards.result import (
     get_result_keyboard,
-    get_unknown_document_keyboard,
 )
 from app.bot.keyboards.templates import get_templates_selection_keyboard
 from app.bot.messages.renderers import MessageRenderer
@@ -17,6 +16,7 @@ from app.services.image_generator import ReceiptImageGenerator
 from app.services.submission_service import SubmissionService
 from app.templates.loader import default_template_loader
 from app.utils.callback_data import CallbackDataHelper
+from app.bot.handlers.corrections import _safe_edit
 
 logger = logging.getLogger(__name__)
 
@@ -39,43 +39,52 @@ async def handle_callback_query(
     except Exception as e:
         logger.warning(f"Could not answer callback query: {e}")
     cb = CallbackDataHelper.decode(query.data)
+    logger.info(
+        "callback: user=%s action=%s target=%s",
+        tg_id, cb.action, cb.target_id,
+    )
 
     try:
         if cb.action == "menu:main":
             name = update.effective_user.first_name if update.effective_user else ""
-            await query.edit_message_text(
+            await _safe_edit(
+                query,
                 MessageRenderer.render_start_message(name),
-                parse_mode="HTML",
                 reply_markup=get_main_menu_keyboard(is_admin=is_admin),
             )
             return
 
         elif cb.action == "upload":
-            await query.edit_message_text(
+            await _safe_edit(
+                query,
                 MessageRenderer.render_upload_instructions(),
-                parse_mode="HTML",
                 reply_markup=get_main_menu_keyboard(is_admin=is_admin),
             )
             return
 
         elif cb.action == "help":
-            await query.edit_message_text(
+            await _safe_edit(
+                query,
                 MessageRenderer.render_help_message(),
-                parse_mode="HTML",
                 reply_markup=get_main_menu_keyboard(is_admin=is_admin),
             )
             return
 
         elif cb.action == "privacy":
-            await query.edit_message_text(
+            logger.info("callback: privacy screen for user=%s", tg_id)
+            await _safe_edit(
+                query,
                 MessageRenderer.render_privacy_message(),
-                parse_mode="HTML",
                 reply_markup=get_main_menu_keyboard(is_admin=is_admin),
             )
             return
 
         submission_id = cb.target_id
         if not submission_id:
+            logger.warning(
+                "callback: action=%s requires a submission_id but none found (user=%s data=%s)",
+                cb.action, tg_id, query.data,
+            )
             return
 
         async with get_db_session() as session:
@@ -88,17 +97,27 @@ async def handle_callback_query(
 
             if cb.action == "doc:app":
                 submission = await service.approve_submission(submission_id, db_user.id)
-                await query.edit_message_text(
-                    f"✅ <b>Submission Approved</b>\n\nThank you! Submission <code>{submission.id[:8]}</code> has been saved to your history.",
-                    parse_mode="HTML",
+                await _safe_edit(
+                    query,
+                    f"╭────── ✨ <b>Approved & Saved</b> ──────╮\n"
+                    f"\n"
+                    f"  👍  <b>Document Verified</b>\n"
+                    f"  Submission <code>{submission.id[:8]}</code> has been saved\n"
+                    f"  to your document history.\n"
+                    f"\n"
+                    f"╰──────────────────────────────────╯",
                     reply_markup=get_main_menu_keyboard(is_admin=is_admin),
                 )
 
             elif cb.action == "doc:rej":
                 submission = await service.reject_submission(submission_id, db_user.id)
-                await query.edit_message_text(
-                    f"❌ <b>Submission Rejected</b>\n\nSubmission <code>{submission.id[:8]}</code> was discarded.",
-                    parse_mode="HTML",
+                await _safe_edit(
+                    query,
+                    f"╭────── 🗑️ <b>Submission Discarded</b> ──────╮\n"
+                    f"\n"
+                    f"  Submission <code>{submission.id[:8]}</code> was removed.\n"
+                    f"\n"
+                    f"╰──────────────────────────────────╯",
                     reply_markup=get_main_menu_keyboard(is_admin=is_admin),
                 )
 
@@ -118,7 +137,7 @@ async def handle_callback_query(
                 merged = dict(sub.extracted_fields or {})
                 merged.update(sub.corrected_fields or {})
                 kb = get_result_keyboard(submission_id, available_fields=list(merged.keys()), is_shipping_label=is_shipping)
-                await query.edit_message_text(text, parse_mode="HTML", reply_markup=kb)
+                await _safe_edit(query, text, reply_markup=kb)
 
             elif cb.action == "doc:trk":
                 sub_repo = SubmissionRepository(session)
@@ -134,7 +153,7 @@ async def handle_callback_query(
                 merged = dict(sub.extracted_fields or {})
                 merged.update(sub.corrected_fields or {})
                 kb = get_result_keyboard(submission_id, available_fields=list(merged.keys()), is_shipping_label=is_shipping)
-                await query.edit_message_text(text, parse_mode="HTML", reply_markup=kb)
+                await _safe_edit(query, text, reply_markup=kb)
 
             elif cb.action == "doc:down_img":
                 sub_repo = SubmissionRepository(session)
@@ -153,11 +172,18 @@ async def handle_callback_query(
                 file_buf = io.BytesIO(img_bytes)
                 file_buf.name = f"Receipt_{submission_id[:8]}.png"
 
+                try:
+                    await context.bot.send_chat_action(
+                        chat_id=update.effective_chat.id, action="upload_document"
+                    )
+                except Exception:
+                    pass
+
                 await context.bot.send_document(
                     chat_id=update.effective_chat.id,
                     document=file_buf,
                     filename=f"Receipt_{submission_id[:8]}.png",
-                    caption=f"🖼 <b>Here is your updated receipt image file:</b> <code>Receipt_{submission_id[:8]}.png</code>",
+                    caption=f"🖼  <b>High-Resolution Image Ready!</b>\n<code>Receipt_{submission_id[:8]}.png</code>",
                     parse_mode="HTML",
                 )
 
@@ -178,11 +204,18 @@ async def handle_callback_query(
                 file_buf = io.BytesIO(pdf_bytes)
                 file_buf.name = f"Receipt_{submission_id[:8]}.pdf"
 
+                try:
+                    await context.bot.send_chat_action(
+                        chat_id=update.effective_chat.id, action="upload_document"
+                    )
+                except Exception:
+                    pass
+
                 await context.bot.send_document(
                     chat_id=update.effective_chat.id,
                     document=file_buf,
                     filename=f"Receipt_{submission_id[:8]}.pdf",
-                    caption=f"📄 <b>Here is your updated receipt PDF document:</b> <code>Receipt_{submission_id[:8]}.pdf</code>",
+                    caption=f"📄  <b>Vector PDF Document Ready!</b>\n<code>Receipt_{submission_id[:8]}.pdf</code>",
                     parse_mode="HTML",
                 )
 
@@ -202,14 +235,14 @@ async def handle_callback_query(
                     corrected_fields=sub.corrected_fields,
                 )
                 kb = get_result_keyboard(submission_id, available_fields=list(merged.keys()), is_shipping_label=is_shipping)
-                await query.edit_message_text(text, parse_mode="HTML", reply_markup=kb)
+                await _safe_edit(query, text, reply_markup=kb)
 
             elif cb.action == "tpl:choose":
                 templates = default_template_loader.list_templates()
                 kb = get_templates_selection_keyboard(submission_id, templates, page=0)
-                await query.edit_message_text(
+                await _safe_edit(
+                    query,
                     "🧩 <b>Select Document Template</b>\n\nChoose the template that best matches your uploaded document:",
-                    parse_mode="HTML",
                     reply_markup=kb,
                 )
 
@@ -217,9 +250,9 @@ async def handle_callback_query(
                 page = int(cb.extra or "0")
                 templates = default_template_loader.list_templates()
                 kb = get_templates_selection_keyboard(submission_id, templates, page=page)
-                await query.edit_message_text(
+                await _safe_edit(
+                    query,
                     "🧩 <b>Select Document Template</b>\n\nChoose the template that best matches your uploaded document:",
-                    parse_mode="HTML",
                     reply_markup=kb,
                 )
 
@@ -239,7 +272,11 @@ async def handle_callback_query(
                     corrected_fields=sub.corrected_fields,
                 )
                 kb = get_result_keyboard(submission_id, is_shipping_label=is_shipping)
-                await query.edit_message_text(text, parse_mode="HTML", reply_markup=kb)
+                await _safe_edit(query, text, reply_markup=kb)
 
     except Exception as e:
-        logger.error(f"Callback error for user {tg_id}: {e}", exc_info=True)
+        logger.error(
+            "callback: unhandled error — action=%s target=%s user=%s: %s",
+            cb.action, cb.target_id, tg_id, e,
+            exc_info=True,
+        )

@@ -1,5 +1,5 @@
 import pytest
-from app.utils.callback_data import CallbackDataHelper, ParsedCallback
+from app.utils.callback_data import CallbackDataHelper
 
 
 def test_callback_encoding_decoding():

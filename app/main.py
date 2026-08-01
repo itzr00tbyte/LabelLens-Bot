@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import sys
+import warnings
 
 from telegram import BotCommand
 from telegram.request import HTTPXRequest
@@ -8,16 +9,19 @@ from telegram.ext import (
     Application,
     CallbackQueryHandler,
     CommandHandler,
+    ContextTypes,
     ConversationHandler,
     MessageHandler,
     filters,
 )
 
-from app.bot.handlers.admin import admin_command, handle_admin_callback
+from app.bot.handlers.admin import approve_command, disapprove_command, users_command
 from app.bot.handlers.callbacks import handle_callback_query
 from app.bot.handlers.corrections import (
+    WAITING_FOR_CONFIRMATION,
     WAITING_FOR_CORRECTION_VALUE,
     cancel_correction,
+    handle_confirmation,
     handle_dropdown_option,
     process_correction_input,
     select_field_to_correct,
@@ -42,9 +46,10 @@ logger = logging.getLogger(__name__)
 
 async def setup_bot_commands(application: Application) -> None:
     commands = [
-        BotCommand("start", "Open the main menu"),
-        BotCommand("upload", "Upload a receipt or document"),
-        BotCommand("cancel", "Cancel current operation"),
+        BotCommand("start", "Start & main menu"),
+        BotCommand("upload", "Upload new document"),
+        BotCommand("history", "View saved documents"),
+        BotCommand("help", "Help & guide"),
     ]
     try:
         await application.bot.set_my_commands(commands)
@@ -66,6 +71,8 @@ def build_application() -> Application:
     )
 
     # Conversation handler for field correction flow
+    # per_message=False is intentional: tracks state per user+chat, not per button.
+    warnings.filterwarnings("ignore", message=".*per_message=False.*", category=UserWarning)
     correction_handler = ConversationHandler(
         entry_points=[
             CallbackQueryHandler(start_correction_flow, pattern="^doc:corr:"),
@@ -76,13 +83,24 @@ def build_application() -> Application:
                 CallbackQueryHandler(select_field_to_correct, pattern="^doc:field:"),
                 CallbackQueryHandler(handle_dropdown_option, pattern="^doc:opt:"),
                 MessageHandler(filters.TEXT & ~filters.COMMAND, process_correction_input),
-            ]
+            ],
+            WAITING_FOR_CONFIRMATION: [
+                CallbackQueryHandler(handle_confirmation, pattern="^doc:confirm:"),
+                CallbackQueryHandler(handle_confirmation, pattern="^doc:cancel_edit:"),
+            ],
         },
         fallbacks=[CommandHandler("cancel", cancel_correction)],
         per_message=False,
+        allow_reentry=True,  # allow clicking edit buttons after a session ends
     )
 
     app.add_handler(correction_handler)
+
+    # Admin Commands
+    app.add_handler(CommandHandler("approve", approve_command))
+    app.add_handler(CommandHandler("disapprove", disapprove_command))
+    app.add_handler(CommandHandler("revoke", disapprove_command))
+    app.add_handler(CommandHandler("users", users_command))
 
     # Command Handlers
     app.add_handler(CommandHandler("start", start_command))
@@ -91,15 +109,11 @@ def build_application() -> Application:
     app.add_handler(CommandHandler("upload", upload_command))
     app.add_handler(CommandHandler("history", history_command))
     app.add_handler(CommandHandler("cancel", cancel_command))
-    app.add_handler(CommandHandler("admin", admin_command))
 
     # Document & Photo Upload Handler
     app.add_handler(
         MessageHandler(filters.PHOTO | filters.Document.ALL, handle_document_upload)
     )
-
-    # Admin Callback Handler
-    app.add_handler(CallbackQueryHandler(handle_admin_callback, pattern="^adm:"))
 
     # Callback Query Handlers
     app.add_handler(CallbackQueryHandler(handle_history_pagination, pattern="^page:his:"))
@@ -116,7 +130,7 @@ async def global_error_handler(update: object, context: ContextTypes.DEFAULT_TYP
 
 async def main() -> None:
     setup_logging()
-    from colorama import Fore, Style
+    from colorama import Fore, Style  # type: ignore[import-untyped]
     print(
         f"\n{Fore.CYAN}{Style.BRIGHT}"
         "===========================================================\n"
@@ -139,7 +153,8 @@ async def main() -> None:
     logger.info("Starting bot polling...")
     await application.initialize()
     await application.start()
-    await application.updater.start_polling()
+    if application.updater:
+        await application.updater.start_polling()
 
     # Keep running until interrupted
     stop_event = asyncio.Event()
@@ -148,7 +163,8 @@ async def main() -> None:
     except (KeyboardInterrupt, SystemExit):
         logger.info("Stopping bot...")
     finally:
-        await application.updater.stop()
+        if application.updater:
+            await application.updater.stop()
         await application.stop()
         await application.shutdown()
 

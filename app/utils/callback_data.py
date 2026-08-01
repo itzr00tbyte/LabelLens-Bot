@@ -1,4 +1,4 @@
-from typing import NamedTuple, Optional
+from typing import NamedTuple, Optional, Union
 
 
 class ParsedCallback(NamedTuple):
@@ -9,14 +9,15 @@ class ParsedCallback(NamedTuple):
 
 class CallbackDataHelper:
     ACTIONS = [
-        "doc:app", "doc:corr", "doc:field", "doc:opt", "doc:down", "doc:down_img", "doc:down_pdf", "doc:rescan", "doc:rej", "doc:det", "doc:trk", "doc:rev",
+        "doc:app", "doc:corr", "doc:field", "doc:opt", "doc:down", "doc:down_img", "doc:down_pdf",
+        "doc:rescan", "doc:rej", "doc:det", "doc:trk", "doc:rev", "doc:confirm", "doc:cancel_edit",
         "tpl:choose", "tpl:sel", "tpl:pg", "page:his", "menu:main", "menu:admin",
         "adm:tpl", "adm:subs", "adm:stats", "adm:failed", "adm:export", "adm:users",
         "upload", "help", "privacy"
     ]
 
     @staticmethod
-    def encode(action: str, target_id: Optional[str] = None, extra: Optional[str] = None) -> str:
+    def encode(action: str, target_id: Optional[Union[str, int]] = None, extra: Optional[Union[str, int]] = None) -> str:
         parts = [action]
         if target_id is not None:
             parts.append(str(target_id))

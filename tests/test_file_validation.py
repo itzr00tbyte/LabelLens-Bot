@@ -27,3 +27,11 @@ def test_file_size_exceeded():
     valid, err = FileValidator.validate_file_bytes(large_bytes)
     assert valid is False
     assert "exceeds maximum allowed size" in err
+
+
+def test_valid_bytearray_input():
+    jpeg_bytes = bytearray(b"\xFF\xD8\xFF\xE0\x00\x10JFIF\x00\x01" + b"\x00" * 100)
+    valid, ext = FileValidator.validate_file_bytes(jpeg_bytes)
+    assert valid is True
+    assert ext == "jpg"
+

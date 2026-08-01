@@ -1,6 +1,5 @@
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 from datetime import datetime, timezone
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database.models import AuditLog
 
@@ -26,12 +25,3 @@ class AuditRepository:
         self.session.add(log_entry)
         await self.session.flush()
         return log_entry
-
-    async def get_logs_for_submission(self, submission_id: str) -> List[AuditLog]:
-        stmt = (
-            select(AuditLog)
-            .where(AuditLog.submission_id == submission_id)
-            .order_by(AuditLog.created_at.asc())
-        )
-        result = await self.session.execute(stmt)
-        return list(result.scalars().all())
