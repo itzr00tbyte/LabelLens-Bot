@@ -1,0 +1,73 @@
+{
+  "id": "generic_receipt",
+  "name": "Store / Restaurant Receipt",
+  "category": "store_receipt",
+  "version": 1,
+  "priority": 50,
+  "enabled": true,
+  "required_keywords": [
+    "TOTAL"
+  ],
+  "optional_keywords": [
+    "SUBTOTAL",
+    "TAX",
+    "RECEIPT",
+    "THANK YOU",
+    "CHANGE",
+    "CASH",
+    "VISA",
+    "MASTERCARD",
+    "STORE"
+  ],
+  "excluded_keywords": [
+    "TRACKING",
+    "INVOICE NUMBER",
+    "DUE DATE"
+  ],
+  "regex_indicators": [
+    "TOTAL[ :$]*\\d+\\.\\d{2}"
+  ],
+  "minimum_score": 0.60,
+  "fields": {
+    "merchant_name": {
+      "type": "anchored_text",
+      "anchor": "WELCOME TO"
+    },
+    "total": {
+      "type": "regex",
+      "patterns": [
+        "(?:TOTAL|TOTAL DUE|BALANCE DUE|AMOUNT DUE)[ :$]*(\\d+\\.\\d{2})"
+      ],
+      "required": true,
+      "normalize": "currency"
+    },
+    "tax": {
+      "type": "regex",
+      "patterns": [
+        "(?:TAX|SALES TAX)[ :$]*(\\d+\\.\\d{2})"
+      ],
+      "normalize": "currency"
+    },
+    "subtotal": {
+      "type": "regex",
+      "patterns": [
+        "(?:SUBTOTAL|SUB TOTAL)[ :$]*(\\d+\\.\\d{2})"
+      ],
+      "normalize": "currency"
+    },
+    "transaction_date": {
+      "type": "regex",
+      "patterns": [
+        "\\b\\d{1,2}[/-]\\d{1,2}[/-]\\d{2,4}\\b"
+      ],
+      "normalize": "date"
+    }
+  },
+  "actions": [
+    "approve",
+    "correct",
+    "rescan",
+    "reject",
+    "details"
+  ]
+}

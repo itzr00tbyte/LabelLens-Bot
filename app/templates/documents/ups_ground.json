@@ -1,0 +1,55 @@
+{
+  "id": "ups_ground",
+  "name": "UPS Ground",
+  "category": "ups_shipping_label",
+  "version": 1,
+  "priority": 90,
+  "enabled": true,
+  "required_keywords": [
+    "UPS",
+    "TRACKING"
+  ],
+  "optional_keywords": [
+    "GROUND",
+    "SHIP TO",
+    "WEIGHT",
+    "1Z"
+  ],
+  "excluded_keywords": [
+    "USPS",
+    "FEDEX"
+  ],
+  "regex_indicators": [
+    "1Z[A-Z0-9]{16}"
+  ],
+  "minimum_score": 0.72,
+  "fields": {
+    "carrier": {
+      "type": "constant",
+      "value": "UPS"
+    },
+    "service": {
+      "type": "constant",
+      "value": "UPS Ground"
+    },
+    "tracking_number": {
+      "type": "regex",
+      "patterns": [
+        "1Z[A-Z0-9]{16}"
+      ],
+      "required": true,
+      "normalize": "uppercase"
+    },
+    "recipient_name": {
+      "type": "anchored_text",
+      "anchor": "SHIP TO"
+    }
+  },
+  "actions": [
+    "approve",
+    "correct",
+    "rescan",
+    "reject",
+    "details"
+  ]
+}

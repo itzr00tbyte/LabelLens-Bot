@@ -1,0 +1,64 @@
+{
+  "id": "usps_ground_advantage",
+  "name": "USPS Ground Advantage",
+  "category": "usps_shipping_label",
+  "version": 1,
+  "priority": 100,
+  "enabled": true,
+  "required_keywords": [
+    "USPS",
+    "GROUND ADVANTAGE",
+    "TRACKING"
+  ],
+  "optional_keywords": [
+    "SHIP TO",
+    "POSTAGE",
+    "PACKAGE PICKUP",
+    "POST OFFICE",
+    "EPAS",
+    "PRIORITY",
+    "U.S. POSTAGE"
+  ],
+  "excluded_keywords": [
+    "FEDEX",
+    "UPS",
+    "DHL"
+  ],
+  "regex_indicators": [
+    "\\b(?:94\\d{20}|92\\d{20}|93\\d{20}|\\d{22}|(?:\\d[ ]*){20,22})\\b"
+  ],
+  "minimum_score": 0.72,
+  "fields": {
+    "carrier": {
+      "type": "constant",
+      "value": "USPS"
+    },
+    "service": {
+      "type": "constant",
+      "value": "Ground Advantage"
+    },
+    "tracking_number": {
+      "type": "regex",
+      "patterns": [
+        "\\b(?:94\\d{20}|92\\d{20}|93\\d{20}|\\d{22}|(?:\\d[ ]*){20,22})\\b"
+      ],
+      "required": true,
+      "normalize": "digits_only"
+    },
+    "recipient_name": {
+      "type": "anchored_text",
+      "anchor": "SHIP TO"
+    },
+    "recipient_address": {
+      "type": "anchored_block",
+      "anchor": "SHIP TO"
+    }
+  },
+  "actions": [
+    "approve",
+    "correct",
+    "rescan",
+    "reject",
+    "details"
+  ]
+}

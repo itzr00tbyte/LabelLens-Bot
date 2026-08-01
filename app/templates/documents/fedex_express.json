@@ -1,0 +1,54 @@
+{
+  "id": "fedex_express",
+  "name": "FedEx Express / Ground",
+  "category": "fedex_shipping_label",
+  "version": 1,
+  "priority": 90,
+  "enabled": true,
+  "required_keywords": [
+    "FEDEX",
+    "TRACKING"
+  ],
+  "optional_keywords": [
+    "EXPRESS",
+    "GROUND",
+    "DELIVERY",
+    "TRK#"
+  ],
+  "excluded_keywords": [
+    "USPS",
+    "UPS"
+  ],
+  "regex_indicators": [
+    "\\b\\d{12}\\b",
+    "\\b\\d{15}\\b"
+  ],
+  "minimum_score": 0.72,
+  "fields": {
+    "carrier": {
+      "type": "constant",
+      "value": "FedEx"
+    },
+    "service": {
+      "type": "constant",
+      "value": "Express"
+    },
+    "tracking_number": {
+      "type": "regex",
+      "patterns": [
+        "\\b\\d{12}\\b",
+        "\\b\\d{15}\\b",
+        "\\b\\d{20}\\b"
+      ],
+      "required": true,
+      "normalize": "digits_only"
+    }
+  },
+  "actions": [
+    "approve",
+    "correct",
+    "rescan",
+    "reject",
+    "details"
+  ]
+}

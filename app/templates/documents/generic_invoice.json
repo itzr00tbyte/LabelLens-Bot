@@ -1,0 +1,71 @@
+{
+  "id": "generic_invoice",
+  "name": "Invoice",
+  "category": "invoice",
+  "version": 1,
+  "priority": 50,
+  "enabled": true,
+  "required_keywords": [
+    "INVOICE"
+  ],
+  "optional_keywords": [
+    "INVOICE NUMBER",
+    "INVOICE DATE",
+    "DUE DATE",
+    "BALANCE DUE",
+    "BILL TO",
+    "ITEM",
+    "QUANTITY"
+  ],
+  "excluded_keywords": [
+    "TRACKING",
+    "USPS",
+    "SHIP TO"
+  ],
+  "regex_indicators": [
+    "INVOICE[ ]*#?[ ]*[A-Z0-9-]+"
+  ],
+  "minimum_score": 0.60,
+  "fields": {
+    "company_name": {
+      "type": "anchored_text",
+      "anchor": "INVOICE"
+    },
+    "invoice_number": {
+      "type": "regex",
+      "patterns": [
+        "(?:INVOICE|INV)[ ]*(?:#|NO|NUMBER)?[ ]*[:.]?[ ]*([A-Z0-9-]+)"
+      ],
+      "required": true
+    },
+    "invoice_date": {
+      "type": "regex",
+      "patterns": [
+        "(?:INVOICE DATE|DATE)[ ]*[:.]?[ ]*(\\d{1,2}[/-]\\d{1,2}[/-]\\d{2,4})"
+      ],
+      "normalize": "date"
+    },
+    "due_date": {
+      "type": "regex",
+      "patterns": [
+        "(?:DUE DATE)[ ]*[:.]?[ ]*(\\d{1,2}[/-]\\d{1,2}[/-]\\d{2,4})"
+      ],
+      "normalize": "date"
+    },
+    "total": {
+      "type": "regex",
+      "patterns": [
+        "(?:TOTAL|TOTAL DUE|BALANCE DUE)[ ]*[:$]?[ ]*(\\d+\\.\\d{2})"
+      ],
+      "required": true,
+      "normalize": "currency"
+    }
+  },
+  "actions": [
+    "approve",
+    "correct",
+    "rescan",
+    "reject",
+    "details"
+  ]
+}
