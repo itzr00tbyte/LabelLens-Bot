@@ -1,3 +1,4 @@
+import io
 import logging
 import os
 from telegram import Update
@@ -14,6 +15,7 @@ from app.bot.middleware.rate_limit import global_rate_limiter
 from app.config import settings
 from app.database.repositories import SubmissionRepository, UserRepository
 from app.database.session import get_db_session
+from app.services.image_generator import ReceiptImageGenerator
 from app.services.submission_service import SubmissionService
 from app.utils.file_validation import FileValidator
 from app.utils.identifiers import generate_error_reference
@@ -105,22 +107,44 @@ async def handle_document_upload(
                 and "shipping_label" in match_res.template.category
             )
 
-            if match_res.template and match_res.score >= settings.LOW_CONFIDENCE_THRESHOLD:
-                text = MessageRenderer.render_result_summary(
+            # Add 👍 thumbs-up reaction to the user's uploaded attachment message
+            if update.message:
+                try:
+                    await update.message.set_reaction("👍")
+                except Exception as e:
+                    logger.debug(f"Could not set message reaction: {e}")
+
+            if match_res.template and match_res.score >= settings.MIN_TEMPLATE_CONFIDENCE:
+                text = MessageRenderer.render_final_updated_receipt(
                     document_type=doc_type,
                     confidence=match_res.score,
                     extracted_fields=submission.extracted_fields,
                     corrected_fields=submission.corrected_fields,
                 )
                 kb = get_result_keyboard(submission_id, is_shipping_label=is_shipping)
-            elif match_res.template and match_res.score >= settings.MIN_TEMPLATE_CONFIDENCE:
-                text = MessageRenderer.render_low_confidence(doc_type, match_res.score)
-                kb = get_low_confidence_keyboard(submission_id)
+
+                # Generate updated receipt image
+                merged = dict(submission.extracted_fields or {})
+                merged.update(submission.corrected_fields or {})
+                img = ReceiptImageGenerator.generate_receipt_image(doc_type, merged, is_shipping=is_shipping)
+                img_bytes = ReceiptImageGenerator.get_image_bytes(img, format="PNG")
+
+                if update.effective_chat:
+                    try:
+                        await status_msg.delete()
+                    except Exception:
+                        pass
+                    await context.bot.send_photo(
+                        chat_id=update.effective_chat.id,
+                        photo=io.BytesIO(img_bytes),
+                        caption=text,
+                        parse_mode="HTML",
+                        reply_markup=kb,
+                    )
             else:
                 text = MessageRenderer.render_unknown_document()
                 kb = get_unknown_document_keyboard(submission_id)
-
-            await status_msg.edit_text(text, parse_mode="HTML", reply_markup=kb)
+                await status_msg.edit_text(text, parse_mode="HTML", reply_markup=kb)
 
     except Exception as e:
         logger.error(f"Error handling upload for user {tg_id}: {e}", exc_info=True)

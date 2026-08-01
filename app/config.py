@@ -17,8 +17,8 @@ class Settings(BaseSettings):
 
     TESSERACT_CMD: Optional[str] = None
     MAX_UPLOAD_MB: int = 10
-    MIN_TEMPLATE_CONFIDENCE: float = 0.72
-    LOW_CONFIDENCE_THRESHOLD: float = 0.82
+    MIN_TEMPLATE_CONFIDENCE: float = 0.50
+    LOW_CONFIDENCE_THRESHOLD: float = 0.50
 
     STORE_ORIGINAL_IMAGES: bool = False
     STORE_OCR_TEXT: bool = True
