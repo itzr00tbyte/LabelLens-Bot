@@ -107,14 +107,13 @@ async def handle_document_upload(
                 and "shipping_label" in match_res.template.category
             )
 
-            # Add 👍 thumbs-up reaction to the user's uploaded attachment message
-            if update.message:
-                try:
-                    await update.message.set_reaction("👍")
-                except Exception as e:
-                    logger.debug(f"Could not set message reaction: {e}")
-
             if match_res.template and match_res.score >= settings.MIN_TEMPLATE_CONFIDENCE:
+                # Add 👍 thumbs-up reaction ONLY when image scan is matched (>= 50%)
+                if update.message:
+                    try:
+                        await update.message.set_reaction("👍")
+                    except Exception as e:
+                        logger.debug(f"Could not set message reaction: {e}")
                 text = MessageRenderer.render_final_updated_receipt(
                     document_type=doc_type,
                     confidence=match_res.score,
