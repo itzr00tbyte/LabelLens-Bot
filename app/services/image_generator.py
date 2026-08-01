@@ -39,29 +39,75 @@ def _load_font(size: int, bold: bool = False) -> ImageFont.ImageFont:
         return ImageFont.load_default()
 
 
-def _draw_qr_matrix(draw: ImageDraw.ImageDraw, x: int, y: int, size: int, seed: int = 42) -> None:
-    """Draws a crisp, realistic 2D DataMatrix / QR code pattern."""
+def _draw_real_qr_code(draw: ImageDraw.ImageDraw, x: int, y: int, size: int, seed: int = 42) -> None:
+    """Draws an authentic QR Code with standard 7x7 corner finder patterns."""
+    grid_n = 25
+    cell = size / grid_n
     rnd = random.Random(seed)
-    grid_size = 16
-    cell = size / grid_size
-    for row in range(grid_size):
-        for col in range(grid_size):
-            cx = x + col * cell
-            cy = y + row * cell
-            # Outer frame borders & position detection patterns
-            if row == 0 or row == grid_size - 1 or col == 0 or col == grid_size - 1:
+
+    grid = [[0] * grid_n for _ in range(grid_n)]
+
+    def place_finder(r_top: int, c_top: int) -> None:
+        for r in range(7):
+            for c in range(7):
+                if r in (0, 6) or c in (0, 6) or (2 <= r <= 4 and 2 <= c <= 4):
+                    grid[r_top + r][c_top + c] = 1
+
+    place_finder(0, 0)
+    place_finder(0, grid_n - 7)
+    place_finder(grid_n - 7, 0)
+
+    # Random data modules outside finder patterns & timing patterns
+    for r in range(grid_n):
+        for c in range(grid_n):
+            if (r < 8 and c < 8) or (r < 8 and c >= grid_n - 8) or (r >= grid_n - 8 and c < 8):
+                continue
+            if r == 6 or c == 6:
+                if (r + c) % 2 == 0:
+                    grid[r][c] = 1
+                continue
+            if rnd.random() > 0.46:
+                grid[r][c] = 1
+
+    for r in range(grid_n):
+        for c in range(grid_n):
+            if grid[r][c] == 1:
+                cx = x + c * cell
+                cy = y + r * cell
                 draw.rectangle([cx, cy, cx + cell, cy + cell], fill=(0, 0, 0))
-            elif (row < 5 and col < 5) or (row < 5 and col >= grid_size - 5) or (row >= grid_size - 5 and col < 5):
-                if row in (1, 3) and col in (1, 3):
-                    fill_col = (0, 0, 0)
-                elif row == 2 or col == 2:
-                    fill_col = (0, 0, 0)
-                else:
-                    fill_col = (255, 255, 255)
-                draw.rectangle([cx, cy, cx + cell, cy + cell], fill=fill_col)
-            else:
-                if rnd.random() > 0.42:
-                    draw.rectangle([cx, cy, cx + cell, cy + cell], fill=(0, 0, 0))
+
+
+def _draw_datamatrix_code(draw: ImageDraw.ImageDraw, x: int, y: int, size: int, seed: int = 101) -> None:
+    """Draws an authentic 2D DataMatrix code with solid L-border and alternating top/right borders."""
+    grid_n = 16
+    cell = size / grid_n
+    rnd = random.Random(seed)
+
+    grid = [[0] * grid_n for _ in range(grid_n)]
+
+    # Solid L-border on Left & Bottom
+    for i in range(grid_n):
+        grid[i][0] = 1
+        grid[grid_n - 1][i] = 1
+
+    # Alternating border on Top & Right
+    for i in range(grid_n):
+        if i % 2 == 0:
+            grid[0][i] = 1
+            grid[i][grid_n - 1] = 1
+
+    # Inner data matrix
+    for r in range(1, grid_n - 1):
+        for c in range(1, grid_n - 1):
+            if rnd.random() > 0.48:
+                grid[r][c] = 1
+
+    for r in range(grid_n):
+        for c in range(grid_n):
+            if grid[r][c] == 1:
+                cx = x + c * cell
+                cy = y + r * cell
+                draw.rectangle([cx, cy, cx + cell, cy + cell], fill=(0, 0, 0))
 
 
 def _draw_code128_barcode(draw: ImageDraw.ImageDraw, x: int, y: int, width: int, height: int, code_str: str) -> None:
@@ -134,24 +180,22 @@ class ReceiptImageGenerator:
 
     @staticmethod
     def _draw_usps_label(draw: ImageDraw.ImageDraw, width: int, height: int, fields: Dict[str, Any], doc_type: str) -> None:
-        # Fonts
-        font_huge = _load_font(75, bold=True)
-        font_title = _load_font(26, bold=True)
+        # Fonts matching official USPS label
+        font_huge = _load_font(72, bold=True)
+        font_title = _load_font(24, bold=True)
         font_header = _load_font(20, bold=True)
-        font_body_bold = _load_font(16, bold=True)
-        font_body = _load_font(15, bold=False)
-        font_small = _load_font(12, bold=False)
-        font_tracking = _load_font(21, bold=True)
+        font_body_bold = _load_font(15, bold=True)
+        font_body = _load_font(14, bold=False)
+        font_small = _load_font(11, bold=False)
+        font_tracking = _load_font(20, bold=True)
 
         # 1. Outer Border Box
         draw.rectangle([10, 10, width - 10, height - 10], outline=(0, 0, 0), width=3)
 
         # 2. Top Header Block (y: 10 to 145)
-        # Box 1: Huge "G" (Top Left)
         draw.line([135, 10, 135, 145], fill=(0, 0, 0), width=2)
         service_name = str(fields.get("service") or fields.get("service_type") or "GROUND ADVANTAGE").upper()
-        
-        # Determine Letter Badge (G for Ground Advantage, P for Priority, etc.)
+
         badge_letter = "G"
         if "priority" in service_name.lower():
             badge_letter = "P"
@@ -162,12 +206,12 @@ class ReceiptImageGenerator:
 
         draw.text((72, 75), badge_letter, fill=(0, 0, 0), font=font_huge, anchor="mm")
 
-        # Box 2: QR Code + Text (Middle Header)
-        _draw_qr_matrix(draw, 150, 22, size=75, seed=101)
+        # Top Middle: Authentic QR Code + Pickup text
+        _draw_real_qr_code(draw, 150, 22, size=75, seed=101)
         header_text = "Scan for Free\nPackage Pickup\nor to Find a\nPost Office"
-        draw.text((238, 25), header_text, fill=(0, 0, 0), font=font_small, spacing=4)
+        draw.text((238, 25), header_text, fill=(0, 0, 0), font=font_small, spacing=3)
 
-        # Box 3: Postage Box (Top Right)
+        # Top Right: Postage Box
         draw.line([450, 10, 450, 145], fill=(0, 0, 0), width=2)
         draw.rectangle([458, 18, 582, 95], outline=(0, 0, 0), width=1)
         postage_text = "NO POSTAGE\nNECESSARY IF\nMAILED IN THE\nUNITED STATES"
@@ -184,49 +228,51 @@ class ReceiptImageGenerator:
         sender_val = str(fields.get("sender_address") or fields.get("ship_from") or fields.get("sender_name") or "ALBERT OSBORN\n421 SUNNY MAGNOLIA ROW\nCOMMERCE CITY CO 80229")
         sender_lines = [l.strip().upper() for l in sender_val.split("\n") if l.strip()]
         if len(sender_lines) == 1:
-            # Try splitting by comma
             sender_lines = [l.strip().upper() for l in sender_val.split(",") if l.strip()]
 
         y_send = 210
         for line in sender_lines[:3]:
             draw.text((25, y_send), line, fill=(0, 0, 0), font=font_body)
-            y_send += 22
+            y_send += 20
 
         # Right side reference 0001 & R004 box
         draw.text((570, 220), "0001", fill=(0, 0, 0), font=font_header, anchor="ra")
-        draw.rectangle([460, 260, 545, 305], outline=(0, 0, 0), width=2)
+        draw.rectangle([460, 260, 545, 305], outline=(0, 0, 0), width=1)
         draw.text((502, 282), "R004", fill=(0, 0, 0), font=font_body_bold, anchor="mm")
 
-        # 5. Ship To & QR Code Block (y: 370 to 600)
+        # 5. Ship To & DataMatrix Block (y: 370 to 600)
         draw.line([10, 370, width - 10, 370], fill=(0, 0, 0), width=3)
 
         # Left side 2D DataMatrix barcode
-        _draw_qr_matrix(draw, 25, 430, size=75, seed=202)
+        _draw_datamatrix_code(draw, 25, 430, size=75, seed=202)
 
-        # Recipient SHIP TO block
-        recip_val = str(fields.get("recipient_address") or fields.get("address") or fields.get("ship_to") or fields.get("recipient_name") or "FOOD LION\n1410 RIVER RIDGE DR\nCLEMMONS NC 27012-8355")
-        recip_lines = [l.strip().upper() for l in recip_val.replace("SHIP TO:", "").split("\n") if l.strip()]
-        if len(recip_lines) == 1:
-            recip_lines = [l.strip().upper() for l in recip_val.replace("SHIP TO:", "").split(",") if l.strip()]
-
-        draw.text((115, 410), "SHIP TO:", fill=(0, 0, 0), font=font_body)
+        # Clean Recipient SHIP TO block
+        raw_recip = str(fields.get("recipient_address") or fields.get("address") or fields.get("ship_to") or fields.get("recipient_name") or "FOOD LION\n1410 RIVER RIDGE DR\nCLEMMONS NC 27012-8355")
         
-        y_recip = 410
+        # Clean any stray tracking text
+        cleaned_recip = raw_recip.replace("USPS TRACKING #", "").replace("USPS TRACKING", "").replace("SHIP TO:", "").strip()
+        recip_lines = [l.strip().upper() for l in cleaned_recip.split("\n") if l.strip()]
+        if len(recip_lines) == 1:
+            recip_lines = [l.strip().upper() for l in cleaned_recip.split(",") if l.strip()]
+
+        draw.text((120, 415), "SHIP TO:", fill=(0, 0, 0), font=font_body_bold)
+
+        y_recip = 415
         if recip_lines:
             # First line next to SHIP TO:
-            draw.text((200, y_recip), recip_lines[0], fill=(0, 0, 0), font=font_body_bold)
-            y_recip += 30
+            draw.text((205, y_recip), recip_lines[0], fill=(0, 0, 0), font=font_body_bold)
+            y_recip += 28
             for line in recip_lines[1:]:
-                draw.text((200, y_recip), line, fill=(0, 0, 0), font=font_body_bold)
-                y_recip += 28
+                draw.text((205, y_recip), line, fill=(0, 0, 0), font=font_body_bold)
+                y_recip += 26
 
         # 6. Tracking Section (y: 600 to 830)
         draw.line([10, 600, width - 10, 600], fill=(0, 0, 0), width=3)
         draw.text((width // 2, 622), f"{carrier_name} TRACKING #", fill=(0, 0, 0), font=font_header, anchor="mm")
 
-        # Draw Code 128 Barcode
+        # Code 128 Barcode
         raw_trk = str(fields.get("tracking_number") or "9748577400768408852981")
-        _draw_code128_barcode(draw, 65, 650, width=470, height=115, code_str=raw_trk)
+        _draw_code128_barcode(draw, 65, 650, width=470, height=118, code_str=raw_trk)
 
         # Formatted 4-digit Spaced Tracking Number
         formatted_trk = _format_tracking_number(raw_trk)
@@ -234,7 +280,7 @@ class ReceiptImageGenerator:
 
         # 7. Bottom Barcode & Footer (y: 830 to 890)
         draw.line([10, 830, width - 10, 830], fill=(0, 0, 0), width=3)
-        _draw_qr_matrix(draw, 525, 838, size=48, seed=303)
+        _draw_datamatrix_code(draw, 525, 838, size=48, seed=303)
 
     @staticmethod
     def _draw_store_receipt(draw: ImageDraw.ImageDraw, width: int, height: int, fields: Dict[str, Any], doc_type: str) -> None:
