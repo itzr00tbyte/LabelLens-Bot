@@ -81,6 +81,6 @@ class AddressGenerator:
                 region = zip_code[0]
                 city, state = REGION_STATE_MAP.get(region, ("Springfield", "US"))
 
-            return f"{street_num} {street_name}, {city}, {state} {zip_code}"
+            return f"{street_num} {street_name}\n{city} {state} {zip_code}"
 
         return clean

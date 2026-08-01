@@ -238,9 +238,20 @@ class ReceiptImageGenerator:
 
         recip_name = str(fields.get("recipient_name") or "").strip().upper()
         recip_addr_raw = str(fields.get("recipient_address") or fields.get("address") or fields.get("ship_to") or "").strip()
-
         cleaned_recip = recip_addr_raw.replace("USPS TRACKING #", "").replace("USPS TRACKING", "").replace("SHIP TO:", "").strip()
-        recip_lines = [l.strip().upper() for l in cleaned_recip.split("\n") if l.strip()]
+        lines_raw = [l.strip().upper() for l in cleaned_recip.split("\n") if l.strip()]
+
+        recip_lines = []
+        for line in lines_raw:
+            if "," in line:
+                parts = [p.strip() for p in line.split(",") if p.strip()]
+                if len(parts) >= 2:
+                    recip_lines.append(parts[0])
+                    recip_lines.append(" ".join(parts[1:]))
+                else:
+                    recip_lines.append(line)
+            else:
+                recip_lines.append(line)
 
         if not recip_name:
             if recip_lines:
