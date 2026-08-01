@@ -100,11 +100,21 @@ async def select_field_to_correct(
     submission_id = context.user_data.get("editing_submission_id") or cb.target_id
     field_key = cb.extra
 
-    if not field_key:
+    if not field_key or not submission_id:
         return ConversationHandler.END
 
     # Resolve full field name if key was truncated for callback safety
-    fields_dict = context.user_data.get("editing_submission_fields") or {}
+    fields_dict = context.user_data.get("editing_submission_fields")
+    if not fields_dict:
+        async with get_db_session() as session:
+            sub_repo = SubmissionRepository(session)
+            sub = await sub_repo.get_by_id(submission_id)
+            if sub:
+                fields_dict = dict(sub.extracted_fields or {})
+                fields_dict.update(sub.corrected_fields or {})
+                context.user_data["editing_submission_fields"] = fields_dict
+
+    fields_dict = fields_dict or {}
     full_field_name = field_key
     for original_key in fields_dict.keys():
         if original_key.startswith(field_key) or field_key.startswith(original_key):

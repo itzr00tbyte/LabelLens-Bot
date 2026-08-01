@@ -68,7 +68,8 @@ def build_application() -> Application:
     # Conversation handler for field correction flow
     correction_handler = ConversationHandler(
         entry_points=[
-            CallbackQueryHandler(start_correction_flow, pattern="^doc:corr:")
+            CallbackQueryHandler(start_correction_flow, pattern="^doc:corr:"),
+            CallbackQueryHandler(select_field_to_correct, pattern="^doc:field:"),
         ],
         states={
             WAITING_FOR_CORRECTION_VALUE: [
