@@ -109,6 +109,14 @@ def build_application() -> Application:
 
 async def main() -> None:
     setup_logging()
+    from colorama import Fore, Style
+    print(
+        f"\n{Fore.CYAN}{Style.BRIGHT}"
+        "===========================================================\n"
+        "         🚀 LABELLENS TELEGRAM BOT INITIALIZING           \n"
+        "===========================================================\n"
+        f"{Style.RESET_ALL}"
+    )
     logger.info("Initializing database...")
     await init_db()
 
