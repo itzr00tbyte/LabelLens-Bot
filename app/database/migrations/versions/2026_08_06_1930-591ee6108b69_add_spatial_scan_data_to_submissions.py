@@ -9,6 +9,7 @@ from typing import Sequence, Union
 
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy import inspect
 
 
 # revision identifiers, used by Alembic.
@@ -19,11 +20,19 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    # Add spatial_scan_data JSON column to submissions table.
-    # NOTE: The alter_column for users.is_approved is intentionally omitted —
-    # SQLite does not support ALTER COLUMN, and the column is already correct in the model.
-    op.add_column('submissions', sa.Column('spatial_scan_data', sa.JSON(), nullable=True))
+    # Idempotent: only add the column if it doesn't already exist.
+    # This handles the case where init_db() previously ran create_all()
+    # and the column was created before Alembic took over.
+    conn = op.get_bind()
+    inspector = inspect(conn)
+    existing_columns = [col["name"] for col in inspector.get_columns("submissions")]
+    if "spatial_scan_data" not in existing_columns:
+        op.add_column("submissions", sa.Column("spatial_scan_data", sa.JSON(), nullable=True))
 
 
 def downgrade() -> None:
-    op.drop_column('submissions', 'spatial_scan_data')
+    conn = op.get_bind()
+    inspector = inspect(conn)
+    existing_columns = [col["name"] for col in inspector.get_columns("submissions")]
+    if "spatial_scan_data" in existing_columns:
+        op.drop_column("submissions", "spatial_scan_data")
