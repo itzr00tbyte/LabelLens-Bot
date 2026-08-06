@@ -36,13 +36,11 @@ if [ -d ".venv" ]; then
     echo "[✓] Using virtual environment: .venv"
 elif command -v python3 >/dev/null 2>&1; then
     PYTHON="python3"
-    # Try to find pip — could be pip3, pip, or python3 -m pip
     if command -v pip3 >/dev/null 2>&1; then
         PIP="pip3"
     elif command -v pip >/dev/null 2>&1; then
         PIP="pip"
     else
-        # Last resort: use python3 -m pip (works if pip is installed as a module)
         PIP="python3 -m pip"
     fi
     echo "[✓] Using global python3: $(which python3)"
@@ -51,14 +49,19 @@ else
     exit 1
 fi
 
+# Ensure no duplicate instances run simultaneously (avoids Telegram Conflict error)
+if command -v pm2 >/dev/null 2>&1; then
+    pm2 stop labellens-bot 2>/dev/null || true
+fi
+pkill -f "app.main" 2>/dev/null || true
+sleep 1
+
 echo ""
 echo "[1/4] Pulling latest updates from Git repository..."
 git pull origin main || true
 
 echo ""
 echo "[2/4] Installing / Updating Python requirements..."
-# Use production requirements only (dev tools not needed on server)
-# Try plain install first (Ubuntu 22.04), fall back to --break-system-packages (Debian 12+)
 $PIP install -r requirements.txt 2>/dev/null \
     || $PIP install -r requirements.txt --break-system-packages
 

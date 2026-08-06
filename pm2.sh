@@ -57,6 +57,7 @@ case "$COMMAND" in
         run_migrations
 
         echo "[3/3] Starting LabelLens Bot under PM2..."
+        pkill -f "app.main" 2>/dev/null || true
         pm2 start ecosystem.config.js
         pm2 save
         echo "[✓] Bot started."
