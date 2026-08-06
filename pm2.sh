@@ -36,9 +36,10 @@ mkdir -p logs
 # ── Helper: install requirements ────────────────────────────────────────────
 install_requirements() {
     echo "    Installing Python requirements..."
-    # Try --break-system-packages first (Debian 12+ / Ubuntu 23+)
-    $PIP install -r requirements.txt --break-system-packages 2>/dev/null \
-        || $PIP install -r requirements.txt
+    # Try plain install first (Ubuntu 22.04 / older pip has no --break-system-packages)
+    # Fall back to --break-system-packages for Debian 12+ / Ubuntu 23+
+    $PIP install -r requirements.txt 2>/dev/null \
+        || $PIP install -r requirements.txt --break-system-packages
 }
 
 # ── Helper: run alembic migration ───────────────────────────────────────────

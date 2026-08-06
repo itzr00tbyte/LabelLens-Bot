@@ -58,7 +58,9 @@ git pull origin main || true
 echo ""
 echo "[2/4] Installing / Updating Python requirements..."
 # Use production requirements only (dev tools not needed on server)
-$PIP install -r requirements.txt --break-system-packages 2>/dev/null || $PIP install -r requirements.txt
+# Try plain install first (Ubuntu 22.04), fall back to --break-system-packages (Debian 12+)
+$PIP install -r requirements.txt 2>/dev/null \
+    || $PIP install -r requirements.txt --break-system-packages
 
 echo ""
 echo "[3/4] Applying database migrations..."
