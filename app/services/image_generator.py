@@ -109,8 +109,9 @@ def _draw_datamatrix_code(draw: ImageDraw.ImageDraw, x: int, y: int, size: int, 
 
 def _draw_code128_barcode(draw: ImageDraw.ImageDraw, x: int, y: int, width: int, height: int, code_str: str) -> None:
     """Draws a clean, high-density Code 128 barcode pattern."""
-    digits = "".join(c for c in code_str if c.isdigit()) or "9748577400768408852981"
-    rnd = random.Random(int(digits[:8]))
+    digits = "".join(c for c in str(code_str) if c.isalnum()) or "9748577400768408852981"
+    seed_val = sum(ord(c) for c in digits)
+    rnd = random.Random(seed_val)
 
     curr_x = x
     start_bars = [2, 1, 1, 2, 3, 2]
@@ -119,8 +120,9 @@ def _draw_code128_barcode(draw: ImageDraw.ImageDraw, x: int, y: int, width: int,
         draw.rectangle([curr_x, y, curr_x + w * 2.5, y + height], fill=color)
         curr_x += w * 2.5
 
-    for digit in digits:
-        pattern = [1, 2, 1, 3, 1, 2] if int(digit) % 2 == 0 else [2, 1, 2, 2, 1, 3]
+    for char in digits:
+        val = ord(char)
+        pattern = [1, 2, 1, 3, 1, 2] if val % 2 == 0 else [2, 1, 2, 2, 1, 3]
         for i, w in enumerate(pattern):
             color = (0, 0, 0) if i % 2 == 0 else (255, 255, 255)
             draw.rectangle([curr_x, y, curr_x + w * 2.5, y + height], fill=color)
@@ -140,11 +142,11 @@ def _draw_code128_barcode(draw: ImageDraw.ImageDraw, x: int, y: int, width: int,
 
 
 def _format_tracking_number(trk_raw: str) -> str:
-    """Formats tracking digits into 4-digit spaced groups."""
-    digits = "".join(c for c in trk_raw if c.isdigit())
-    if not digits:
+    """Formats tracking digits/chars into 4-digit spaced groups."""
+    raw = str(trk_raw).replace(" ", "").upper()
+    if not raw:
         return "9748 5774 0076 8408 8529 81"
-    chunks = [digits[i:i+4] for i in range(0, len(digits), 4)]
+    chunks = [raw[i:i+4] for i in range(0, len(raw), 4)]
     return " ".join(chunks)
 
 
@@ -157,7 +159,7 @@ class ReceiptImageGenerator:
     ) -> Image.Image:
         """
         Generates a 100% high-resolution (800x1200) pixel-accurate receipt or shipping label image
-        matching official USPS Ground Advantage layout.
+        matching official carrier clone layouts (USPS, UPS, FedEx, or Store Receipt).
         """
         width = 800
         height = 1200
@@ -165,8 +167,14 @@ class ReceiptImageGenerator:
         image = Image.new("RGB", (width, height), (255, 255, 255))
         draw = ImageDraw.Draw(image)
 
-        doc_lower = document_type.lower()
-        if is_shipping or "shipping" in doc_lower or "usps" in doc_lower or "ups" in doc_lower or "fedex" in doc_lower:
+        doc_lower = str(document_type).lower()
+        carrier = str(fields.get("carrier") or "").lower()
+
+        if "ups" in doc_lower or "ups" in carrier:
+            ReceiptImageGenerator._draw_ups_label(draw, width, height, fields, document_type)
+        elif "fedex" in doc_lower or "fedex" in carrier:
+            ReceiptImageGenerator._draw_fedex_label(draw, width, height, fields, document_type)
+        elif "usps" in doc_lower or "usps" in carrier or "shipping" in doc_lower or is_shipping:
             ReceiptImageGenerator._draw_usps_label(draw, width, height, fields, document_type)
         else:
             ReceiptImageGenerator._draw_store_receipt(draw, width, height, fields, document_type)
@@ -175,6 +183,7 @@ class ReceiptImageGenerator:
 
     @staticmethod
     def _draw_usps_label(draw: ImageDraw.ImageDraw, width: int, height: int, fields: Dict[str, Any], doc_type: str) -> None:
+        """USPS Ground Advantage authentic clone generator (800x1200)."""
         font_huge = _load_font(115, bold=True)
         font_title = _load_font(32, bold=False)
         font_header = _load_font(30, bold=True)
@@ -183,7 +192,7 @@ class ReceiptImageGenerator:
         font_small = _load_font(16, bold=False)
         font_tracking = _load_font(28, bold=True)
 
-        # 1. Outer Border Box (2px border at edge)
+        # 1. Outer Border Box
         draw.rectangle([2, 2, width - 2, height - 2], outline=(0, 0, 0), width=3)
 
         # 2. Top Header Block (y: 2 to 195)
@@ -193,10 +202,6 @@ class ReceiptImageGenerator:
         badge_letter = "G"
         if "priority" in service_name.lower():
             badge_letter = "P"
-        elif "express" in service_name.lower() or "fedex" in str(fields.get("carrier")).lower():
-            badge_letter = "E"
-        elif "ups" in str(fields.get("carrier")).lower():
-            badge_letter = "U"
 
         draw.text((90, 100), badge_letter, fill=(0, 0, 0), font=font_huge, anchor="mm")
 
@@ -218,7 +223,7 @@ class ReceiptImageGenerator:
         draw.text((width // 2, 227), banner_title, fill=(0, 0, 0), font=font_title, anchor="mm")
         draw.line([2, 260, width - 2, 260], fill=(0, 0, 0), width=4)
 
-        # 4. Central Panel (Sender & Recipient - NO extra horizontal divider line at y=370!)
+        # 4. Central Panel (Sender & Recipient - continuous panel)
         sender_val = str(fields.get("sender_address") or fields.get("ship_from") or fields.get("sender_name") or "ALBERT OSBORN\n421 SUNNY MAGNOLIA ROW\nCOMMERCE CITY CO 80229")
         sender_lines = [l.strip().upper() for l in sender_val.split("\n") if l.strip()]
         if len(sender_lines) == 1:
@@ -234,7 +239,7 @@ class ReceiptImageGenerator:
         draw.rectangle([615, 345, 730, 405], outline=(0, 0, 0), width=2)
         draw.text((672, 375), "R004", fill=(0, 0, 0), font=font_body, anchor="mm")
 
-        # Recipient Block (Lower part of Central Panel)
+        # Recipient Block
         _draw_datamatrix_code(draw, 35, 570, size=105, seed=202)
 
         recip_name = str(fields.get("recipient_name") or "").strip().upper()
@@ -290,7 +295,183 @@ class ReceiptImageGenerator:
         _draw_datamatrix_code(draw, 700, 1110, size=75, seed=303)
 
     @staticmethod
+    def _draw_ups_label(draw: ImageDraw.ImageDraw, width: int, height: int, fields: Dict[str, Any], doc_type: str) -> None:
+        """UPS Ground / Saver authentic clone generator (800x1200)."""
+        font_huge = _load_font(70, bold=True)
+        font_title = _load_font(34, bold=True)
+        font_header = _load_font(28, bold=True)
+        font_body_bold = _load_font(22, bold=True)
+        font_body = _load_font(20, bold=False)
+        font_small = _load_font(16, bold=False)
+        font_tracking = _load_font(28, bold=True)
+
+        # Outer border
+        draw.rectangle([2, 2, width - 2, height - 2], outline=(0, 0, 0), width=3)
+
+        # 1. Top Section (Sender info left, Weight/Date right)
+        sender_val = str(fields.get("sender_address") or fields.get("ship_from") or fields.get("sender_name") or "TARGET STORES #1892\n800 TOWER RD\nSCHAUMBURG IL 60173")
+        sender_lines = [l.strip().upper() for l in sender_val.split("\n") if l.strip()]
+
+        y_send = 25
+        draw.text((35, y_send), "SHIP FROM:", fill=(0, 0, 0), font=font_small)
+        y_send += 24
+        for line in sender_lines[:3]:
+            draw.text((35, y_send), line, fill=(0, 0, 0), font=font_body)
+            y_send += 28
+
+        # Top Right Info
+        weight_val = str(fields.get("weight") or "1.0 LBS").upper()
+        draw.text((580, 25), "1 LBS  1 OF 1", fill=(0, 0, 0), font=font_body_bold)
+        draw.text((580, 55), f"SHP WT: {weight_val}", fill=(0, 0, 0), font=font_body)
+        draw.text((580, 85), "DATE: 08 AUG 2026", fill=(0, 0, 0), font=font_small)
+
+        # 2. Service Banner Divider
+        draw.line([2, 185, width - 2, 185], fill=(0, 0, 0), width=4)
+
+        service_name = str(fields.get("service") or "UPS GROUND").upper()
+        if "SAVER" in str(doc_type).upper() or "SAVER" in str(fields).upper():
+            service_name = "UPS GROUND SAVER"
+
+        # Badge Box on Right
+        draw.rectangle([620, 205, 770, 310], fill=(0, 0, 0))
+        draw.text((695, 257), "UPS", fill=(255, 255, 255), font=font_huge, anchor="mm")
+
+        draw.text((35, 245), service_name, fill=(0, 0, 0), font=font_title)
+        draw.text((35, 285), "TRACKING NUMBER & DELIVERY DETAILS", fill=(0, 0, 0), font=font_small)
+
+        draw.line([2, 330, width - 2, 330], fill=(0, 0, 0), width=4)
+
+        # 3. Recipient & MaxiCode Section (y: 330 to 680)
+        _draw_datamatrix_code(draw, 35, 360, size=140, seed=404)
+
+        recip_name = str(fields.get("recipient_name") or "JOHN SMITH").strip().upper()
+        recip_addr = str(fields.get("recipient_address") or fields.get("address") or fields.get("ship_to") or "100 MAIN STREET\nCHICAGO IL 60601").strip().upper()
+        recip_lines = [l.strip() for l in recip_addr.split("\n") if l.strip()]
+
+        draw.text((210, 360), "SHIP TO:", fill=(0, 0, 0), font=font_body_bold)
+        draw.text((320, 360), recip_name, fill=(0, 0, 0), font=font_body_bold)
+
+        y_recip = 402
+        for line in recip_lines:
+            draw.text((320, y_recip), line, fill=(0, 0, 0), font=font_body_bold)
+            y_recip += 38
+
+        # 4. Tracking Barcode Section (y: 680 to 1050)
+        draw.line([2, 680, width - 2, 680], fill=(0, 0, 0), width=4)
+
+        raw_trk = str(fields.get("tracking_number") or "1ZAG59389010935288").upper().replace(" ", "")
+        draw.text((width // 2, 715), f"TRACKING #: {raw_trk}", fill=(0, 0, 0), font=font_header, anchor="mm")
+
+        _draw_code128_barcode(draw, 85, 760, width=630, height=180, code_str=raw_trk)
+
+        formatted_trk = _format_tracking_number(raw_trk)
+        draw.text((width // 2, 985), formatted_trk, fill=(0, 0, 0), font=font_tracking, anchor="mm")
+
+        # 5. Billing & References Footer (y: 1050 to 1198)
+        draw.line([2, 1050, width - 2, 1050], fill=(0, 0, 0), width=4)
+
+        ref1 = str(fields.get("reference_1") or "REF 1: INV-89201").upper()
+        ref2 = str(fields.get("reference_2") or "BILLING: P/P").upper()
+
+        draw.text((35, 1080), ref1, fill=(0, 0, 0), font=font_body)
+        draw.text((35, 1120), ref2, fill=(0, 0, 0), font=font_body)
+
+        _draw_datamatrix_code(draw, 700, 1080, size=90, seed=505)
+
+    @staticmethod
+    def _draw_fedex_label(draw: ImageDraw.ImageDraw, width: int, height: int, fields: Dict[str, Any], doc_type: str) -> None:
+        """FedEx Ground / Express / Home Delivery authentic clone generator (800x1200)."""
+        font_huge = _load_font(75, bold=True)
+        font_title = _load_font(34, bold=True)
+        font_header = _load_font(28, bold=True)
+        font_body_bold = _load_font(22, bold=True)
+        font_body = _load_font(20, bold=False)
+        font_small = _load_font(16, bold=False)
+        font_tracking = _load_font(28, bold=True)
+
+        # Outer border
+        draw.rectangle([2, 2, width - 2, height - 2], outline=(0, 0, 0), width=3)
+
+        # 1. Header FedEx Brand & Sender Info
+        draw.text((35, 25), "FedEx", fill=(0, 0, 0), font=font_title)
+        draw.text((160, 32), "Express / Ground", fill=(0, 0, 0), font=font_small)
+
+        sender_val = str(fields.get("sender_address") or fields.get("ship_from") or fields.get("sender_name") or "FEDEX DISPATCH\n50 FEDEX PKWY\nMEMPHIS TN 38118")
+        sender_lines = [l.strip().upper() for l in sender_val.split("\n") if l.strip()]
+
+        y_send = 75
+        draw.text((35, y_send), "FROM:", fill=(0, 0, 0), font=font_small)
+        y_send += 24
+        for line in sender_lines[:3]:
+            draw.text((35, y_send), line, fill=(0, 0, 0), font=font_body)
+            y_send += 28
+
+        # Top Right CAD & Weight
+        weight_val = str(fields.get("weight") or "1.0 LBS").upper()
+        draw.text((560, 25), "CAD: 87483562", fill=(0, 0, 0), font=font_body)
+        draw.text((560, 58), f"WGT: {weight_val}", fill=(0, 0, 0), font=font_body_bold)
+        draw.text((560, 91), "DATE: 08 AUG 2026", fill=(0, 0, 0), font=font_small)
+
+        # 2. Service Title & Badge Banner
+        draw.line([2, 195, width - 2, 195], fill=(0, 0, 0), width=4)
+
+        service_name = str(fields.get("service") or "FEDEX GROUND").upper()
+        doc_upper = str(doc_type).upper()
+        if "HOME" in doc_upper or "HOME" in str(fields).upper():
+            service_name = "FEDEX HOME DELIVERY"
+            badge_char = "H"
+        elif "EXPRESS" in doc_upper or "EXPRESS" in str(fields).upper():
+            service_name = "FEDEX EXPRESS"
+            badge_char = "E"
+        elif "RETURN" in doc_upper or "RETURN" in str(fields).upper():
+            service_name = "FEDEX GROUND RETURN"
+            badge_char = "R"
+        else:
+            badge_char = "G"
+
+        # Badge Box on Right
+        draw.rectangle([630, 215, 770, 320], fill=(0, 0, 0))
+        draw.text((700, 267), badge_char, fill=(255, 255, 255), font=font_huge, anchor="mm")
+
+        draw.text((35, 245), service_name, fill=(0, 0, 0), font=font_title)
+        draw.text((35, 285), "DELIVERY CONFIRMATION & TRACKING", fill=(0, 0, 0), font=font_small)
+
+        draw.line([2, 335, width - 2, 335], fill=(0, 0, 0), width=4)
+
+        # 3. Recipient Block (y: 335 to 700)
+        _draw_datamatrix_code(draw, 35, 365, size=130, seed=606)
+
+        recip_name = str(fields.get("recipient_name") or "ACME CORP").strip().upper()
+        recip_addr = str(fields.get("recipient_address") or fields.get("address") or fields.get("ship_to") or "500 CORPORATE PKWY\nDALLAS TX 75201").strip().upper()
+        recip_lines = [l.strip() for l in recip_addr.split("\n") if l.strip()]
+
+        draw.text((200, 365), "TO:", fill=(0, 0, 0), font=font_body_bold)
+        draw.text((270, 365), recip_name, fill=(0, 0, 0), font=font_body_bold)
+
+        y_recip = 407
+        for line in recip_lines:
+            draw.text((270, y_recip), line, fill=(0, 0, 0), font=font_body_bold)
+            y_recip += 38
+
+        # 4. Tracking Barcode Section (y: 700 to 1070)
+        draw.line([2, 700, width - 2, 700], fill=(0, 0, 0), width=4)
+
+        raw_trk = str(fields.get("tracking_number") or "874835624920").upper().replace(" ", "")
+        draw.text((width // 2, 735), f"TRK# [ {raw_trk} ]", fill=(0, 0, 0), font=font_header, anchor="mm")
+
+        _draw_code128_barcode(draw, 85, 780, width=630, height=180, code_str=raw_trk)
+
+        formatted_trk = _format_tracking_number(raw_trk)
+        draw.text((width // 2, 1000), formatted_trk, fill=(0, 0, 0), font=font_tracking, anchor="mm")
+
+        # 5. Footer (y: 1070 to 1198)
+        draw.line([2, 1070, width - 2, 1070], fill=(0, 0, 0), width=4)
+        draw.text((35, 1100), "FORM 2D - FEDEX ROUTING SYSTEM", fill=(0, 0, 0), font=font_body)
+        _draw_datamatrix_code(draw, 700, 1090, size=90, seed=707)
+
+    @staticmethod
     def _draw_store_receipt(draw: ImageDraw.ImageDraw, width: int, height: int, fields: Dict[str, Any], doc_type: str) -> None:
+        """Authentic store/restaurant receipt clone generator (800x1200)."""
         font_title = _load_font(34, bold=True)
         font_header = _load_font(26, bold=True)
         font_body_bold = _load_font(22, bold=True)
