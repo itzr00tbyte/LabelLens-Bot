@@ -15,6 +15,7 @@ from app.database.repositories import (
 from app.services.extraction_service import FieldExtractionService
 from app.services.image_service import ImageProcessingService
 from app.services.ocr_service import OCRService
+from app.services.spatial_scanner import SpatialScanner
 from app.services.template_matcher import MatchResult, TemplateMatcher
 
 logger = logging.getLogger(__name__)
@@ -93,6 +94,25 @@ class SubmissionService:
                 submission.document_category = match_res.template.category
                 submission.match_confidence = match_res.score
                 submission.extracted_fields = extracted
+
+                # 5. Spatial scan — bounding box coordinates & receipt dimensions
+                try:
+                    spatial_res = SpatialScanner.scan_image(
+                        image_input=resized_image,
+                        filename=submission.original_filename or "document",
+                        extracted_fields=extracted
+                    )
+                    from dataclasses import asdict
+                    # Store compact scan: dimensions + field bboxes only (tokens omitted for DB size)
+                    submission.spatial_scan_data = {
+                        "dimensions": asdict(spatial_res.dimensions),
+                        "total_tokens": spatial_res.total_tokens,
+                        "average_confidence": spatial_res.average_confidence,
+                        "field_bboxes": spatial_res.field_bboxes,
+                        "scanned_at": spatial_res.scanned_at,
+                    }
+                except Exception as spatial_err:
+                    logger.warning(f"Spatial scan failed for {submission_id}: {spatial_err}")
 
                 target_status = (
                     SubmissionStatus.MATCHED

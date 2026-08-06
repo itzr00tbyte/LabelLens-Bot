@@ -92,6 +92,7 @@ class Submission(Base):
     ocr_confidence: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     extracted_fields: Mapped[Dict[str, Any]] = mapped_column(JSON, default=dict, nullable=False)
     corrected_fields: Mapped[Dict[str, Any]] = mapped_column(JSON, default=dict, nullable=False)
+    spatial_scan_data: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSON, nullable=True)
     approved_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     rejected_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)

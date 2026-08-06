@@ -1,18 +1,32 @@
+# Python
 .venv/
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
+
+# Testing
 .pytest_cache/
 .coverage
 htmlcov/
+
+# Database & secrets
 *.db
 *.sqlite
 *.sqlite3
 bot.db
 .env
+
+# OS
 .DS_Store
+
+# Logs & media
 *.log*
+logs/
+
+# Dev scratch workspace
+scratch/
+
+# Large binary media files at root
 *.mp4
 *.MP4
-logs/
