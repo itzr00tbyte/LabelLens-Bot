@@ -15,3 +15,4 @@ bot.db
 *.log*
 *.mp4
 *.MP4
+logs/
