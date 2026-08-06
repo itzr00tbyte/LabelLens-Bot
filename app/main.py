@@ -1,7 +1,11 @@
 import asyncio
 import logging
+import os
 import sys
 import warnings
+
+# Ensure project root directory is in sys.path for module imports
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from telegram import BotCommand
 from telegram.request import HTTPXRequest
