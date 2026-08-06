@@ -2,8 +2,7 @@ module.exports = {
   apps: [
     {
       name: "labellens-bot",
-      script: "-m",
-      args: "app.main",
+      script: "app/main.py",
       interpreter: "./.venv/bin/python",
       cwd: "./",
       instances: 1,
