@@ -21,33 +21,47 @@ if [ ! -f ".env" ]; then
     fi
 fi
 
-# Check system Tesseract installation on Linux
+# Check system Tesseract installation
 if command -v tesseract >/dev/null 2>&1; then
     echo "[✓] Tesseract OCR detected at: $(which tesseract)"
 else
-    echo "[!] Warning: Tesseract OCR binary not found in PATH."
-    echo "    On Linux (Debian/Ubuntu), run: sudo apt-get update && sudo apt-get install -y tesseract-ocr tesseract-ocr-eng"
+    echo "[!] Warning: Tesseract OCR not found in PATH."
+    echo "    On Debian/Ubuntu: sudo apt-get install -y tesseract-ocr tesseract-ocr-eng"
+fi
+
+# Resolve python & pip — prefer .venv if it exists
+if [ -d ".venv" ]; then
+    PYTHON=".venv/bin/python"
+    PIP=".venv/bin/pip"
+    echo "[✓] Using virtual environment: .venv"
+elif command -v python3 >/dev/null 2>&1; then
+    PYTHON="python3"
+    # Try to find pip — could be pip3, pip, or python3 -m pip
+    if command -v pip3 >/dev/null 2>&1; then
+        PIP="pip3"
+    elif command -v pip >/dev/null 2>&1; then
+        PIP="pip"
+    else
+        PIP="python3 -m pip"
+    fi
+    echo "[✓] Using global python3: $(which python3)"
+else
+    echo "[✗] Error: No python3 interpreter found. Aborting."
+    exit 1
 fi
 
 echo ""
-echo "[1/3] Pulling latest updates from Git repository..."
+echo "[1/4] Pulling latest updates from Git repository..."
 git pull origin main || true
 
 echo ""
-echo "[2/3] Installing / Updating Python requirements..."
-if [ -d ".venv" ]; then
-    echo "Using virtual environment .venv..."
-    source .venv/bin/activate
-    pip install -r requirements.txt
-else
-    echo "Installing requirements globally using system python3..."
-    pip3 install -r requirements.txt --break-system-packages 2>/dev/null || pip3 install -r requirements.txt
-fi
+echo "[2/4] Installing / Updating Python requirements..."
+$PIP install -r requirements.txt --break-system-packages 2>/dev/null || $PIP install -r requirements.txt
 
 echo ""
-echo "[3/3] Starting LabelLens Telegram Bot..."
-if [ -d ".venv" ]; then
-    python3 -m app.main
-else
-    python3 app/main.py
-fi
+echo "[3/4] Applying database migrations..."
+$PYTHON -m alembic upgrade head
+
+echo ""
+echo "[4/4] Starting LabelLens Telegram Bot..."
+exec $PYTHON -m app.main
