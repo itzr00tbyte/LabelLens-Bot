@@ -1,0 +1,249 @@
+[
+  {
+    "category": "Fedx",
+    "filename": "874835624920 (3).png",
+    "template": "FedEx Ground",
+    "dimensions": {
+      "width": 1200,
+      "height": 1800,
+      "aspect_ratio": 0.6667
+    },
+    "total_tokens": 69,
+    "average_confidence": 70.52,
+    "scan_file": "Samples/spatial_scans/Fedx/874835624920 (3).spatial.json"
+  },
+  {
+    "category": "Fedx",
+    "filename": "874835624920 (4).png",
+    "template": "FedEx Ground Return",
+    "dimensions": {
+      "width": 1200,
+      "height": 1800,
+      "aspect_ratio": 0.6667
+    },
+    "total_tokens": 72,
+    "average_confidence": 72.47,
+    "scan_file": "Samples/spatial_scans/Fedx/874835624920 (4).spatial.json"
+  },
+  {
+    "category": "Fedx",
+    "filename": "874835624920 (5).png",
+    "template": "FedEx Ground Return",
+    "dimensions": {
+      "width": 1200,
+      "height": 1800,
+      "aspect_ratio": 0.6667
+    },
+    "total_tokens": 79,
+    "average_confidence": 69.51,
+    "scan_file": "Samples/spatial_scans/Fedx/874835624920 (5).spatial.json"
+  },
+  {
+    "category": "Fedx",
+    "filename": "874835624920 (6).png",
+    "template": "FedEx Home Delivery",
+    "dimensions": {
+      "width": 1200,
+      "height": 1800,
+      "aspect_ratio": 0.6667
+    },
+    "total_tokens": 69,
+    "average_confidence": 74.33,
+    "scan_file": "Samples/spatial_scans/Fedx/874835624920 (6).spatial.json"
+  },
+  {
+    "category": "UPS",
+    "filename": "1ZAG59389010935288 (10).png",
+    "template": "UPS Ground",
+    "dimensions": {
+      "width": 1200,
+      "height": 1800,
+      "aspect_ratio": 0.6667
+    },
+    "total_tokens": 26,
+    "average_confidence": 88.35,
+    "scan_file": "Samples/spatial_scans/UPS/1ZAG59389010935288 (10).spatial.json"
+  },
+  {
+    "category": "UPS",
+    "filename": "1ZAG59389010935288 (11).png",
+    "template": "UPS Ground",
+    "dimensions": {
+      "width": 1200,
+      "height": 1800,
+      "aspect_ratio": 0.6667
+    },
+    "total_tokens": 24,
+    "average_confidence": 86.42,
+    "scan_file": "Samples/spatial_scans/UPS/1ZAG59389010935288 (11).spatial.json"
+  },
+  {
+    "category": "UPS",
+    "filename": "1ZAG59389010935288 (12).png",
+    "template": "UPS Ground",
+    "dimensions": {
+      "width": 1200,
+      "height": 1800,
+      "aspect_ratio": 0.6667
+    },
+    "total_tokens": 40,
+    "average_confidence": 78.28,
+    "scan_file": "Samples/spatial_scans/UPS/1ZAG59389010935288 (12).spatial.json"
+  },
+  {
+    "category": "UPS",
+    "filename": "1ZAG59389010935288 (13).png",
+    "template": "UPS Ground",
+    "dimensions": {
+      "width": 1200,
+      "height": 1800,
+      "aspect_ratio": 0.6667
+    },
+    "total_tokens": 24,
+    "average_confidence": 88.29,
+    "scan_file": "Samples/spatial_scans/UPS/1ZAG59389010935288 (13).spatial.json"
+  },
+  {
+    "category": "UPS",
+    "filename": "1ZAG59389010935288 (14).png",
+    "template": "UPS Ground",
+    "dimensions": {
+      "width": 1200,
+      "height": 1800,
+      "aspect_ratio": 0.6667
+    },
+    "total_tokens": 27,
+    "average_confidence": 77.85,
+    "scan_file": "Samples/spatial_scans/UPS/1ZAG59389010935288 (14).spatial.json"
+  },
+  {
+    "category": "UPS",
+    "filename": "1ZAG59389010935288 (5).png",
+    "template": "UPS Ground",
+    "dimensions": {
+      "width": 1200,
+      "height": 1800,
+      "aspect_ratio": 0.6667
+    },
+    "total_tokens": 21,
+    "average_confidence": 87.05,
+    "scan_file": "Samples/spatial_scans/UPS/1ZAG59389010935288 (5).spatial.json"
+  },
+  {
+    "category": "UPS",
+    "filename": "1ZAG59389010935288 (6).png",
+    "template": "UPS Ground",
+    "dimensions": {
+      "width": 1200,
+      "height": 1800,
+      "aspect_ratio": 0.6667
+    },
+    "total_tokens": 25,
+    "average_confidence": 83.44,
+    "scan_file": "Samples/spatial_scans/UPS/1ZAG59389010935288 (6).spatial.json"
+  },
+  {
+    "category": "UPS",
+    "filename": "1ZAG59389010935288 (7).png",
+    "template": "UPS Ground",
+    "dimensions": {
+      "width": 1200,
+      "height": 1800,
+      "aspect_ratio": 0.6667
+    },
+    "total_tokens": 23,
+    "average_confidence": 86.09,
+    "scan_file": "Samples/spatial_scans/UPS/1ZAG59389010935288 (7).spatial.json"
+  },
+  {
+    "category": "UPS",
+    "filename": "1ZAG59389010935288 (8).png",
+    "template": "UPS Ground",
+    "dimensions": {
+      "width": 1200,
+      "height": 1800,
+      "aspect_ratio": 0.6667
+    },
+    "total_tokens": 25,
+    "average_confidence": 85.32,
+    "scan_file": "Samples/spatial_scans/UPS/1ZAG59389010935288 (8).spatial.json"
+  },
+  {
+    "category": "UPS",
+    "filename": "1ZAG59389010935288 (9).png",
+    "template": "UPS Ground",
+    "dimensions": {
+      "width": 1200,
+      "height": 1800,
+      "aspect_ratio": 0.6667
+    },
+    "total_tokens": 24,
+    "average_confidence": 86.79,
+    "scan_file": "Samples/spatial_scans/UPS/1ZAG59389010935288 (9).spatial.json"
+  },
+  {
+    "category": "USPS",
+    "filename": "9402036106715003247961 (10).png",
+    "template": "USPS Ground Advantage",
+    "dimensions": {
+      "width": 1200,
+      "height": 1800,
+      "aspect_ratio": 0.6667
+    },
+    "total_tokens": 54,
+    "average_confidence": 88.15,
+    "scan_file": "Samples/spatial_scans/USPS/9402036106715003247961 (10).spatial.json"
+  },
+  {
+    "category": "USPS",
+    "filename": "9402036106715003247961 (6).png",
+    "template": "USPS Ground Advantage",
+    "dimensions": {
+      "width": 1200,
+      "height": 1800,
+      "aspect_ratio": 0.6667
+    },
+    "total_tokens": 57,
+    "average_confidence": 85.33,
+    "scan_file": "Samples/spatial_scans/USPS/9402036106715003247961 (6).spatial.json"
+  },
+  {
+    "category": "USPS",
+    "filename": "9402036106715003247961 (7).png",
+    "template": "USPS Ground Advantage",
+    "dimensions": {
+      "width": 1200,
+      "height": 1800,
+      "aspect_ratio": 0.6667
+    },
+    "total_tokens": 59,
+    "average_confidence": 83.31,
+    "scan_file": "Samples/spatial_scans/USPS/9402036106715003247961 (7).spatial.json"
+  },
+  {
+    "category": "USPS",
+    "filename": "9402036106715003247961 (8).png",
+    "template": "USPS Ground Advantage",
+    "dimensions": {
+      "width": 1200,
+      "height": 1800,
+      "aspect_ratio": 0.6667
+    },
+    "total_tokens": 54,
+    "average_confidence": 88.83,
+    "scan_file": "Samples/spatial_scans/USPS/9402036106715003247961 (8).spatial.json"
+  },
+  {
+    "category": "USPS",
+    "filename": "9402036106715003247961 (9).png",
+    "template": "USPS Ground Advantage",
+    "dimensions": {
+      "width": 1200,
+      "height": 1800,
+      "aspect_ratio": 0.6667
+    },
+    "total_tokens": 55,
+    "average_confidence": 88.85,
+    "scan_file": "Samples/spatial_scans/USPS/9402036106715003247961 (9).spatial.json"
+  }
+]
