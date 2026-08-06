@@ -1,9 +1,16 @@
+const fs = require('fs');
+const path = require('path');
+
+// Automatically use .venv python if present, otherwise fallback to global system python3
+const venvPython = path.join(__dirname, '.venv', 'bin', 'python');
+const interpreter = fs.existsSync(venvPython) ? venvPython : 'python3';
+
 module.exports = {
   apps: [
     {
       name: "labellens-bot",
       script: "app/main.py",
-      interpreter: "./.venv/bin/python",
+      interpreter: interpreter,
       cwd: "./",
       instances: 1,
       autorestart: true,

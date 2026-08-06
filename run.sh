@@ -8,6 +8,7 @@ echo "==================================================="
 # Export Linux performance & process environment variables
 export PYTHONUNBUFFERED=1
 export OMP_NUM_THREADS=${OMP_NUM_THREADS:-2}
+export PYTHONPATH=.
 
 # Auto-provision .env if missing
 if [ ! -f ".env" ]; then
@@ -29,22 +30,24 @@ else
 fi
 
 echo ""
-echo "[1/4] Pulling latest updates from Git repository..."
+echo "[1/3] Pulling latest updates from Git repository..."
 git pull origin main || true
 
 echo ""
-echo "[2/4] Checking Python Virtual Environment..."
-if [ ! -d ".venv" ]; then
-    echo "Creating virtual environment .venv..."
-    python3 -m venv .venv
+echo "[2/3] Installing / Updating Python requirements..."
+if [ -d ".venv" ]; then
+    echo "Using virtual environment .venv..."
+    source .venv/bin/activate
+    pip install -r requirements.txt
+else
+    echo "Installing requirements globally using system python3..."
+    pip3 install -r requirements.txt --break-system-packages 2>/dev/null || pip3 install -r requirements.txt
 fi
 
 echo ""
-echo "[3/4] Installing / Updating Python requirements..."
-source .venv/bin/activate
-pip install --upgrade pip
-pip install -r requirements.txt
-
-echo ""
-echo "[4/4] Starting LabelLens Telegram Bot..."
-python3 -m app.main
+echo "[3/3] Starting LabelLens Telegram Bot..."
+if [ -d ".venv" ]; then
+    python3 -m app.main
+else
+    python3 app/main.py
+fi
