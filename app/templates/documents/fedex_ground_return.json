@@ -6,17 +6,17 @@
   "priority": 105,
   "enabled": true,
   "required_keywords": [
-    "FEDEX",
     "RETURN"
   ],
   "optional_keywords": [
+    "FEDEX",
+    "FEDS",
+    "FED2X",
     "GROUND",
-    "RMA:",
     "TRK#",
     "CAD:",
     "FROM:",
-    "TO",
-    "DEPT:"
+    "TO"
   ],
   "excluded_keywords": [
     "HOME DELIVERY",
@@ -30,7 +30,7 @@
     "\\bTRK#?\\s*\\d{4}\\s*\\d{4}\\s*\\d{4}\\b",
     "\\b\\d{12}\\b"
   ],
-  "minimum_score": 0.70,
+  "minimum_score": 0.5,
   "fields": {
     "carrier": {
       "type": "constant",
@@ -43,6 +43,7 @@
     "tracking_number": {
       "type": "regex",
       "patterns": [
+        "TRK[#F]?\\s*(\\d{4}\\s*\\d{4}\\s*\\d{4})",
         "TRK#?\\s*(\\d{4}\\s*\\d{4}\\s*\\d{4})",
         "\\b(\\d{12})\\b"
       ],
