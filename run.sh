@@ -42,6 +42,7 @@ elif command -v python3 >/dev/null 2>&1; then
     elif command -v pip >/dev/null 2>&1; then
         PIP="pip"
     else
+        # Last resort: use python3 -m pip (works if pip is installed as a module)
         PIP="python3 -m pip"
     fi
     echo "[✓] Using global python3: $(which python3)"

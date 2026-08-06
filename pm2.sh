@@ -13,20 +13,52 @@ if ! command -v pm2 >/dev/null 2>&1; then
     exit 1
 fi
 
-# Resolve python interpreter (venv-first)
+# ── Resolve python interpreter (venv-first, then global) ────────────────────
 if [ -d ".venv" ]; then
     PYTHON=".venv/bin/python"
+    PIP=".venv/bin/pip"
+    echo "[✓] Using .venv interpreter"
 else
     PYTHON="python3"
+    # Resolve pip — try pip3, pip, then python3 -m pip as last resort
+    if command -v pip3 >/dev/null 2>&1; then
+        PIP="pip3"
+    elif command -v pip >/dev/null 2>&1; then
+        PIP="pip"
+    else
+        PIP="python3 -m pip"
+    fi
+    echo "[✓] Using global python3: $(which python3)"
 fi
 
 mkdir -p logs
 
+# ── Helper: install requirements ────────────────────────────────────────────
+install_requirements() {
+    echo "    Installing Python requirements..."
+    # Try --break-system-packages first (Debian 12+ / Ubuntu 23+)
+    $PIP install -r requirements.txt --break-system-packages 2>/dev/null \
+        || $PIP install -r requirements.txt
+}
+
+# ── Helper: run alembic migration ───────────────────────────────────────────
+run_migrations() {
+    echo "    Running: PYTHONPATH=. $PYTHON -m alembic upgrade head"
+    PYTHONPATH=. $PYTHON -m alembic upgrade head
+}
+
 case "$COMMAND" in
     start)
-        echo "[1/1] Starting LabelLens Bot under PM2..."
+        echo "[1/3] Installing / Updating Python requirements..."
+        install_requirements
+
+        echo "[2/3] Applying database migrations..."
+        run_migrations
+
+        echo "[3/3] Starting LabelLens Bot under PM2..."
         pm2 start ecosystem.config.js
         pm2 save
+        echo "[✓] Bot started."
         ;;
     stop)
         echo "Stopping LabelLens Bot..."
@@ -37,14 +69,16 @@ case "$COMMAND" in
         pm2 restart labellens-bot
         ;;
     deploy)
-        # Full deploy: pull latest → apply migrations → reload bot (zero-downtime)
-        echo "[1/3] Pulling latest changes from Git..."
+        echo "[1/4] Pulling latest changes from Git..."
         git pull origin main
 
-        echo "[2/3] Applying database migrations..."
-        PYTHONPATH=. $PYTHON -m alembic upgrade head
+        echo "[2/4] Installing / Updating Python requirements..."
+        install_requirements
 
-        echo "[3/3] Reloading bot process..."
+        echo "[3/4] Applying database migrations..."
+        run_migrations
+
+        echo "[4/4] Reloading bot process (zero-downtime)..."
         if pm2 list | grep -q "labellens-bot"; then
             pm2 reload labellens-bot --update-env
         else
@@ -62,11 +96,11 @@ case "$COMMAND" in
     *)
         echo "Usage: ./pm2.sh {start|stop|restart|deploy|logs|status}"
         echo ""
-        echo "  start    — Start the bot under PM2"
+        echo "  start    — Install deps + migrate DB + start under PM2"
         echo "  stop     — Stop the bot"
         echo "  restart  — Hard restart the bot"
-        echo "  deploy   — Pull latest → migrate DB → zero-downtime reload"
-        echo "  logs     — Tail PM2 logs"
+        echo "  deploy   — Pull latest + install deps + migrate + zero-downtime reload"
+        echo "  logs     — Tail PM2 logs (last 50 lines)"
         echo "  status   — Show PM2 process status"
         exit 1
         ;;
