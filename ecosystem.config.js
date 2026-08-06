@@ -11,6 +11,7 @@ module.exports = {
       max_memory_restart: "1G",
       restart_delay: 3000,
       env: {
+        PYTHONPATH: ".",
         PYTHONUNBUFFERED: "1",
         OMP_NUM_THREADS: "2",
         ENVIRONMENT: "production"
