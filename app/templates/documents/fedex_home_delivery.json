@@ -1,32 +1,35 @@
 {
-  "id": "fedex_express",
-  "name": "FedEx Express",
+  "id": "fedex_home_delivery",
+  "name": "FedEx Home Delivery",
   "category": "fedex_shipping_label",
   "version": 1,
-  "priority": 90,
+  "priority": 100,
   "enabled": true,
   "required_keywords": [
     "FEDEX",
-    "EXPRESS"
+    "HOME DELIVERY"
   ],
   "optional_keywords": [
-    "TRACKING",
-    "PRIORITY",
-    "OVERNIGHT",
-    "DELIVERY",
-    "TRK#"
+    "TRK#",
+    "CAD:",
+    "FROM:",
+    "TO",
+    "COMMERCIAL POINT",
+    "REF:",
+    "INV:",
+    "DEPT:"
   ],
   "excluded_keywords": [
-    "GROUND",
-    "HOME DELIVERY",
     "RETURN",
+    "RMA:",
     "USPS",
     "UPS",
     "DHL"
   ],
   "regex_indicators": [
-    "\\b\\d{12}\\b",
-    "\\b\\d{15}\\b"
+    "HOME DELIVERY",
+    "\\bTRK#?\\s*\\d{4}\\s*\\d{4}\\s*\\d{4}\\b",
+    "\\b\\d{12}\\b"
   ],
   "minimum_score": 0.70,
   "fields": {
@@ -36,17 +39,24 @@
     },
     "service": {
       "type": "constant",
-      "value": "FedEx Express"
+      "value": "FedEx Home Delivery"
     },
     "tracking_number": {
       "type": "regex",
       "patterns": [
-        "\\b\\d{12}\\b",
-        "\\b\\d{15}\\b",
-        "\\b\\d{20}\\b"
+        "TRK#?\\s*(\\d{4}\\s*\\d{4}\\s*\\d{4})",
+        "\\b(\\d{12})\\b"
       ],
       "required": true,
       "normalize": "digits_only"
+    },
+    "recipient_name": {
+      "type": "anchored_text",
+      "anchor": "TO"
+    },
+    "recipient_address": {
+      "type": "anchored_block",
+      "anchor": "TO"
     }
   },
   "actions": [

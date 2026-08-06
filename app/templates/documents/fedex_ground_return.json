@@ -1,0 +1,74 @@
+{
+  "id": "fedex_ground_return",
+  "name": "FedEx Ground Return",
+  "category": "fedex_shipping_label",
+  "version": 1,
+  "priority": 105,
+  "enabled": true,
+  "required_keywords": [
+    "FEDEX",
+    "RETURN"
+  ],
+  "optional_keywords": [
+    "GROUND",
+    "RMA:",
+    "TRK#",
+    "CAD:",
+    "FROM:",
+    "TO",
+    "DEPT:"
+  ],
+  "excluded_keywords": [
+    "HOME DELIVERY",
+    "USPS",
+    "UPS",
+    "DHL"
+  ],
+  "regex_indicators": [
+    "\\bRETURN\\b",
+    "\\bRMA:?\\b",
+    "\\bTRK#?\\s*\\d{4}\\s*\\d{4}\\s*\\d{4}\\b",
+    "\\b\\d{12}\\b"
+  ],
+  "minimum_score": 0.70,
+  "fields": {
+    "carrier": {
+      "type": "constant",
+      "value": "FedEx"
+    },
+    "service": {
+      "type": "constant",
+      "value": "FedEx Ground Return"
+    },
+    "tracking_number": {
+      "type": "regex",
+      "patterns": [
+        "TRK#?\\s*(\\d{4}\\s*\\d{4}\\s*\\d{4})",
+        "\\b(\\d{12})\\b"
+      ],
+      "required": true,
+      "normalize": "digits_only"
+    },
+    "rma_number": {
+      "type": "regex",
+      "patterns": [
+        "RMA:\\s*([A-Z0-9\\-]+)"
+      ]
+    },
+    "recipient_name": {
+      "type": "anchored_text",
+      "anchor": "TO"
+    },
+    "recipient_address": {
+      "type": "anchored_block",
+      "anchor": "TO"
+    }
+  },
+  "actions": [
+    "approve",
+    "correct",
+    "rescan",
+    "reject",
+    "details"
+  ]
+}

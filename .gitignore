@@ -12,4 +12,6 @@ htmlcov/
 bot.db
 .env
 .DS_Store
-*.log
+*.log*
+*.mp4
+*.MP4

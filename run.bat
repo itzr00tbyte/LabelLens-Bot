@@ -32,6 +32,7 @@ if not defined TESS_PATH (
 
 if defined TESS_PATH (
     echo [OK] Tesseract OCR located at: !TESS_PATH!
+    set "TESSERACT_CMD=!TESS_PATH!"
 ) else (
     echo [NOTE] If Tesseract OCR is not installed yet, please download it from:
     echo        https://github.com/UB-Mannheim/tesseract/wiki

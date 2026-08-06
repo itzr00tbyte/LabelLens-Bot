@@ -15,25 +15,56 @@ import sys
 logger = logging.getLogger(__name__)
 
 
-def _autodetect_tesseract() -> Optional[str]:
-    # 1. Use explicitly configured TESSERACT_CMD if valid
-    if settings.TESSERACT_CMD and os.path.exists(settings.TESSERACT_CMD):
-        return settings.TESSERACT_CMD
+import shutil
 
-    # 2. Windows RDP standard paths
+# Prevent OpenMP thread contention on Linux multi-core servers
+if "OMP_NUM_THREADS" not in os.environ:
+    os.environ["OMP_NUM_THREADS"] = "2"
+
+
+def _autodetect_tesseract() -> Optional[str]:
+    # 1. Use explicitly configured TESSERACT_CMD if valid on disk
+    if settings.TESSERACT_CMD:
+        if os.path.exists(settings.TESSERACT_CMD):
+            return settings.TESSERACT_CMD
+        found_cmd = shutil.which(settings.TESSERACT_CMD)
+        if found_cmd:
+            return found_cmd
+
+    # 2. Check system PATH for 'tesseract' or 'tesseract.exe'
+    system_tesseract = shutil.which("tesseract") or shutil.which("tesseract.exe")
+    if system_tesseract and os.path.exists(system_tesseract):
+        logger.info(f"Auto-detected Tesseract executable in PATH at: {system_tesseract}")
+        return system_tesseract
+
+    # 3. Linux standard installation paths
+    if sys.platform.startswith("linux"):
+        possible_linux_paths = [
+            "/usr/bin/tesseract",
+            "/usr/local/bin/tesseract",
+            "/snap/bin/tesseract",
+            "/usr/bin/tesseract-ocr",
+        ]
+        for p in possible_linux_paths:
+            if os.path.exists(p):
+                logger.info(f"Auto-detected Linux Tesseract executable at: {p}")
+                return p
+
+    # 4. Windows RDP standard paths
     if sys.platform == "win32":
         possible_win_paths = [
             r"C:\Program Files\Tesseract-OCR\tesseract.exe",
             r"C:\Program Files (x86)\Tesseract-OCR\tesseract.exe",
             os.path.expandvars(r"%LOCALAPPDATA%\Programs\Tesseract-OCR\tesseract.exe"),
             os.path.expandvars(r"%USERPROFILE%\AppData\Local\Programs\Tesseract-OCR\tesseract.exe"),
+            r"C:\ProgramData\chocolatey\bin\tesseract.exe",
         ]
         for p in possible_win_paths:
-            if os.path.exists(p):
+            if p and os.path.exists(p):
                 logger.info(f"Auto-detected Windows Tesseract executable at: {p}")
                 return p
 
-    # 3. macOS / Linux standard paths
+    # 5. macOS standard paths
     possible_unix_paths = [
         "/opt/homebrew/bin/tesseract",
         "/usr/local/bin/tesseract",
@@ -43,12 +74,18 @@ def _autodetect_tesseract() -> Optional[str]:
         if os.path.exists(p):
             return p
 
-    return settings.TESSERACT_CMD
+    return None
 
 
 tesseract_path = _autodetect_tesseract()
 if tesseract_path:
     pytesseract.pytesseract.tesseract_cmd = tesseract_path
+    logger.info(f"Configured Tesseract CMD: {tesseract_path}")
+else:
+    logger.warning(
+        "Tesseract OCR binary not found in standard paths or PATH. "
+        "Please install Tesseract OCR and set TESSERACT_CMD in .env if needed."
+    )
 
 
 @dataclass
@@ -66,25 +103,23 @@ class OCRService:
     ) -> OCRResult:
         """
         Runs Tesseract OCR asynchronously on PIL image and preprocessed numpy image,
-        combining outputs for highest coverage and accuracy.
+        executing tasks in parallel for optimal throughput on multi-core Linux systems.
         """
         loop = asyncio.get_running_loop()
         
-        # Execute OCR in threadpool executor since pytesseract is blocking
-        result_raw = await loop.run_in_executor(
-            None, OCRService._run_tesseract, image
-        )
-        
         if preprocessed_img is not None:
             preproc_pil = Image.fromarray(preprocessed_img)
-            result_preproc = await loop.run_in_executor(
-                None, OCRService._run_tesseract, preproc_pil
+            # Parallel execution on threadpool executor for ~50% speedup
+            result_raw, result_preproc = await asyncio.gather(
+                loop.run_in_executor(None, OCRService._run_tesseract, image),
+                loop.run_in_executor(None, OCRService._run_tesseract, preproc_pil)
             )
-            # Pick result with higher text length / confidence
+            # Pick result with higher text length / coverage
             if len(result_preproc.text.strip()) > len(result_raw.text.strip()):
                 return result_preproc
+            return result_raw
 
-        return result_raw
+        return await loop.run_in_executor(None, OCRService._run_tesseract, image)
 
     @staticmethod
     def _run_tesseract(image: Image.Image) -> OCRResult:

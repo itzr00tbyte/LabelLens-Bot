@@ -22,6 +22,8 @@ COPY . .
 RUN chown -R botuser:botuser /app
 USER botuser
 
-ENV PYTHONUNBUFFERED=1
+ENV PYTHONUNBUFFERED=1 \
+    OMP_NUM_THREADS=2 \
+    TESSERACT_CMD=/usr/bin/tesseract
 
 CMD ["python", "-m", "app.main"]

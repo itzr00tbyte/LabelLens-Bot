@@ -3,7 +3,7 @@
   "name": "UPS Ground",
   "category": "ups_shipping_label",
   "version": 1,
-  "priority": 90,
+  "priority": 100,
   "enabled": true,
   "required_keywords": [
     "UPS",
@@ -13,16 +13,22 @@
     "GROUND",
     "SHIP TO",
     "WEIGHT",
-    "1Z"
+    "1Z",
+    "1 LBS",
+    "1 OF 1",
+    "BILLING",
+    "REFERENCE"
   ],
   "excluded_keywords": [
     "USPS",
-    "FEDEX"
+    "FEDEX",
+    "DHL"
   ],
   "regex_indicators": [
+    "1Z\\s*[A-Z0-9]{3}\\s*[A-Z0-9]{3}\\s*[A-Z0-9]{2}\\s*\\d{4}\\s*\\d{4}",
     "1Z[A-Z0-9]{16}"
   ],
-  "minimum_score": 0.72,
+  "minimum_score": 0.70,
   "fields": {
     "carrier": {
       "type": "constant",
@@ -35,7 +41,8 @@
     "tracking_number": {
       "type": "regex",
       "patterns": [
-        "1Z[A-Z0-9]{16}"
+        "TRACKING\\s*#?:?\\s*(1Z\\s*[A-Z0-9]{3}\\s*[A-Z0-9]{3}\\s*[A-Z0-9]{2}\\s*\\d{4}\\s*\\d{4})",
+        "\\b(1Z[A-Z0-9]{16})\\b"
       ],
       "required": true,
       "normalize": "uppercase"
@@ -43,6 +50,28 @@
     "recipient_name": {
       "type": "anchored_text",
       "anchor": "SHIP TO"
+    },
+    "recipient_address": {
+      "type": "anchored_block",
+      "anchor": "SHIP TO"
+    },
+    "weight": {
+      "type": "regex",
+      "patterns": [
+        "(\\d+(?:\\.\\d+)?\\s*LBS)"
+      ]
+    },
+    "reference_1": {
+      "type": "regex",
+      "patterns": [
+        "Reference\\s*No\\.1:\\s*([A-Z0-9]+)"
+      ]
+    },
+    "reference_2": {
+      "type": "regex",
+      "patterns": [
+        "Reference\\s*No\\.2:\\s*([A-Z0-9]+)"
+      ]
     }
   },
   "actions": [

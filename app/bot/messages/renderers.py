@@ -1,3 +1,4 @@
+import re
 from typing import Any, Dict, List, Optional
 from app.database.models import Submission
 from app.services.masking_service import SensitiveDataMasker
@@ -16,6 +17,15 @@ _CORNER_R = "╮"
 _CORNER_BL = "╰"
 _CORNER_BR = "╯"
 _VBAR = "│"
+
+_US_STATES = {
+    "AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "FL", "GA",
+    "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD",
+    "MA", "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH", "NJ",
+    "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI", "SC",
+    "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY",
+    "DC", "PR",
+}
 
 # Animated loading bar frames — cycle these per-stage
 _LOADING_BARS = [
@@ -191,15 +201,10 @@ class MessageRenderer:
         lines = [
             f"╭──── ✅ Document Scanned ────╮",
             f"",
-            f"  📄  <b>{doc_label}</b>",
-            f"",
-            f"  <b>Confidence</b>",
-            f"  {bar}",
+            f"📄 <b>{doc_label}</b>",
+            f"<b>Confidence:</b> {bar}",
             f"",
             f"{_DIVIDER}",
-            f"",
-            f"  <b>Extracted Fields</b>",
-            f"",
         ]
 
         merged_fields = dict(extracted_fields or {})
@@ -209,18 +214,230 @@ class MessageRenderer:
             label = escape_html(k.replace("_", " ").title())
             value = escape_html(str(val))
             is_corrected = k in (corrected_fields or {})
-            marker = "  ✏️" if is_corrected else ""
-            lines.append(f"  {_VBAR}  <b>{label}</b>{marker}")
-            lines.append(f"  {_VBAR}  <code>{value}</code>")
-            lines.append(f"  {_VBAR}")
+            marker = " ✏️" if is_corrected else ""
+            if "\n" in value:
+                lines.append(f"📌 <b>{label}</b>{marker}")
+                lines.append(f"<code>{value}</code>")
+            else:
+                lines.append(f"📌 <b>{label}:</b> <code>{value}</code>{marker}")
 
         if not merged_fields:
-            lines.append(f"  <i>No fields could be extracted.</i>")
+            lines.append(f"<i>No fields could be extracted.</i>")
 
-        lines.append(f"")
+        lines.append(f"{_DIVIDER}")
         lines.append(f"<i>Review the fields below or tap ✏️ Edit to correct.</i>")
-        lines.append(f"")
         lines.append(f"╰─────────────────────╯")
+
+        return "\n".join(lines)
+
+    @staticmethod
+    def parse_address_details(raw_address: str) -> Dict[str, str]:
+        """
+        Parses a raw combined address string into structured components:
+        ADDRESS LINE 1, ADDRESS LINE 2, CITY, STATE/PROVINCE, POSTAL CODE.
+        Strips common OCR noise prefixes and tracking number suffixes.
+        """
+        if not raw_address:
+            return {}
+
+        text = str(raw_address).strip()
+        # Clean leading OCR noise prefixes
+        text = re.sub(r"^(?:veya|e-em|em|to:?)\s+(?=\d)", "", text, flags=re.IGNORECASE)
+        # Clean trailing tracking label noise
+        text = re.sub(r",?\s*(?:USPS\s*)?TRACKING\s*#.*$", "", text, flags=re.IGNORECASE)
+        text = text.strip(" ,")
+
+        res: Dict[str, str] = {
+            "ADDRESS LINE 1": "",
+            "ADDRESS LINE 2": "",
+            "CITY": "",
+            "STATE/PROVINCE": "",
+            "POSTAL CODE": "",
+        }
+
+        # Extract ZIP / Postal Code (5 digits or 5+4)
+        zip_match = re.search(r"\b(\d{5}(?:-\d{4})?)\b", text)
+        if zip_match:
+            res["POSTAL CODE"] = zip_match.group(1)
+            text = text[:zip_match.start()] + text[zip_match.end():]
+            text = text.strip(" ,")
+
+        # Extract 2-letter State abbreviation matching valid US states
+        state_match = None
+        for m in re.finditer(r"\b([A-Z]{2})\b", text):
+            if m.group(1).upper() in _US_STATES:
+                state_match = m
+                break
+
+        if state_match:
+            res["STATE/PROVINCE"] = state_match.group(1).upper()
+            before_state = text[:state_match.start()].strip(" ,")
+            after_state = text[state_match.end():].strip(" ,")
+
+            parts = [p.strip() for p in before_state.split(",") if p.strip()]
+            if len(parts) >= 2:
+                res["CITY"] = parts[-1]
+                res["ADDRESS LINE 1"] = ", ".join(parts[:-1])
+            elif parts:
+                words = parts[0].split()
+                if len(words) > 2:
+                    res["CITY"] = words[-1]
+                    res["ADDRESS LINE 1"] = " ".join(words[:-1])
+                else:
+                    res["ADDRESS LINE 1"] = parts[0]
+            if after_state and not res["ADDRESS LINE 2"]:
+                res["ADDRESS LINE 2"] = after_state
+        else:
+            parts = [p.strip() for p in text.split(",") if p.strip()]
+            if parts:
+                res["ADDRESS LINE 1"] = parts[0]
+            if len(parts) > 1:
+                res["CITY"] = parts[-1]
+            if len(parts) > 2:
+                res["ADDRESS LINE 2"] = ", ".join(parts[1:-1])
+
+        return {k: v for k, v in res.items() if v}
+
+    @staticmethod
+    def format_aligned_block(fields: Dict[str, Any], corrected_keys: Optional[set] = None) -> str:
+        """
+        Formats key-value fields into a right-aligned monospaced table inside a Telegram blockquote:
+          RECEIVER NAME | John Doe
+         ADDRESS LINE 1 | 123 Main St
+                   CITY | New York
+        """
+        if not fields:
+            return ""
+
+        corrected_keys = corrected_keys or set()
+        label_tuples = []
+        for k, v in fields.items():
+            if v is None or str(v).strip() == "":
+                continue
+            clean_label = k.replace("_", " ").upper()
+            marker = " ⚡" if k in corrected_keys else ""
+            label_tuples.append((clean_label, str(v), marker))
+
+        if not label_tuples:
+            return ""
+
+        max_len = max(max(len(l) for l, _, _ in label_tuples), 14)
+        block_lines = []
+        for label, val, marker in label_tuples:
+            padded = label.rjust(max_len)
+            block_lines.append(f"{padded} | {val}{marker}")
+
+        content = escape_html("\n".join(block_lines))
+        return f"<blockquote>{content}</blockquote>"
+
+    @staticmethod
+    def render_shipping_confirmation(
+        document_type: str,
+        confidence: float,
+        extracted_fields: Dict[str, Any],
+        corrected_fields: Dict[str, Any],
+    ) -> str:
+        merged = dict(extracted_fields or {})
+        merged.update(corrected_fields or {})
+        corrected_keys = set((corrected_fields or {}).keys())
+
+        carrier = merged.get("carrier") or merged.get("Carrier") or "USPS"
+        service_val = merged.get("service") or merged.get("Service") or ""
+        tracking = (
+            merged.get("tracking_number")
+            or merged.get("tracking")
+            or merged.get("Tracking Number")
+            or "None"
+        )
+
+        # Build detailed canonical SHIP TO fields
+        ship_to_ordered: Dict[str, Any] = {}
+
+        receiver = (
+            merged.get("recipient_name")
+            or merged.get("receiver_name")
+            or merged.get("recipient")
+        )
+        if receiver:
+            ship_to_ordered["RECEIVER NAME"] = receiver
+
+        raw_addr = (
+            merged.get("recipient_address")
+            or merged.get("address")
+            or merged.get("ship_to_address")
+        )
+        parsed_addr = MessageRenderer.parse_address_details(raw_addr) if raw_addr else {}
+
+        addr1 = merged.get("address_line_1") or parsed_addr.get("ADDRESS LINE 1")
+        if addr1:
+            ship_to_ordered["ADDRESS LINE 1"] = addr1
+
+        addr2 = merged.get("address_line_2") or parsed_addr.get("ADDRESS LINE 2")
+        if addr2:
+            ship_to_ordered["ADDRESS LINE 2"] = addr2
+
+        city = merged.get("city") or parsed_addr.get("CITY")
+        if city:
+            ship_to_ordered["CITY"] = city
+
+        state = (
+            merged.get("state")
+            or merged.get("state_province")
+            or parsed_addr.get("STATE/PROVINCE")
+        )
+        if state:
+            ship_to_ordered["STATE/PROVINCE"] = state
+
+        zip_code = (
+            merged.get("postal_code")
+            or merged.get("zip_code")
+            or merged.get("zip")
+            or parsed_addr.get("POSTAL CODE")
+        )
+        if zip_code:
+            ship_to_ordered["POSTAL CODE"] = zip_code
+
+        phone = merged.get("phone") or merged.get("phone_number")
+        if phone:
+            ship_to_ordered["PHONE"] = phone
+
+        company = merged.get("company") or merged.get("organization")
+        if company:
+            ship_to_ordered["COMPANY"] = company
+
+        # Fallback if no specific fields were resolved
+        if not ship_to_ordered and raw_addr:
+            ship_to_ordered["ADDRESS"] = raw_addr
+
+        ship_from = merged.get("ship_from") or merged.get("sender") or "Default: TX"
+        notes = merged.get("notes") or merged.get("Notes") or "None"
+
+        carrier_str = escape_html(str(carrier))
+        if service_val and str(service_val).lower() not in carrier_str.lower():
+            carrier_str += f" ({escape_html(str(service_val))})"
+
+        lines = [
+            "<b>Please confirm the shipping information:</b>",
+            "",
+            f"<b>Tracking Number:</b> <code>{escape_html(str(tracking))}</code>",
+            f"<b>Carrier:</b> {carrier_str}",
+            "",
+            "<b>SHIP TO:</b>",
+        ]
+
+        if ship_to_ordered:
+            lines.append(MessageRenderer.format_aligned_block(ship_to_ordered, corrected_keys))
+        else:
+            lines.append("<blockquote>No recipient details extracted.</blockquote>")
+
+        lines.extend([
+            "",
+            "<b>SHIP FROM:</b>",
+            f"{escape_html(str(ship_from))}",
+            "",
+            "<b>NOTES:</b>",
+            f"{escape_html(str(notes))}",
+        ])
 
         return "\n".join(lines)
 
@@ -233,39 +450,41 @@ class MessageRenderer:
         extracted_fields: Dict[str, Any],
         corrected_fields: Dict[str, Any],
     ) -> str:
+        merged = dict(extracted_fields or {})
+        merged.update(corrected_fields or {})
+
+        # Check if shipping label or contains shipping keys
+        doc_lower = (document_type or "").lower()
+        has_shipping_keys = any(
+            k.lower() in ("carrier", "tracking_number", "ship_to", "recipient_name", "receiver_name")
+            for k in merged.keys()
+        )
+
+        if "shipping" in doc_lower or "label" in doc_lower or has_shipping_keys:
+            return MessageRenderer.render_shipping_confirmation(
+                document_type, confidence, extracted_fields, corrected_fields
+            )
+
         doc_label = escape_html(document_type.replace("_", " ").title())
         conf_pct = round(confidence * 100)
+        corrected_keys = set((corrected_fields or {}).keys())
 
         lines = [
             f"╭────── 🧾 <b>Document Verified</b> ──────╮",
             f"",
-            f"  ✨  <b>{doc_label}</b>",
-            f"  📊  AI Confidence: <b>{conf_pct}%</b>",
+            f"✨ <b>{doc_label}</b>",
+            f"📊 AI Confidence: <b>{conf_pct}%</b>",
             f"",
             f"{_DIVIDER_HEAVY}",
-            f"",
         ]
 
-        merged_fields = dict(extracted_fields or {})
-        merged_fields.update(corrected_fields or {})
-
-        for k, val in merged_fields.items():
-            label = escape_html(k.replace("_", " ").title())
-            value = escape_html(str(val))
-            is_corrected = k in (corrected_fields or {})
-            marker = " <i>⚡ (edited)</i>" if is_corrected else ""
-            lines.append(f"  📌  <b>{label}</b>{marker}")
-            lines.append(f"  <code>{value}</code>")
-            lines.append(f"")
-
-        if not merged_fields:
-            lines.append(f"  <i>No fields found.</i>")
-            lines.append(f"")
+        if merged:
+            lines.append(MessageRenderer.format_aligned_block(merged, corrected_keys))
+        else:
+            lines.append(f"<i>No fields found.</i>")
 
         lines.append(f"{_DIVIDER_HEAVY}")
-        lines.append(f"")
-        lines.append(f"  👍 <i>Tap <b>Approve & Save</b> or edit fields below.</i>")
-        lines.append(f"")
+        lines.append(f"👍 <i>Tap <b>Approve & Save</b> or edit fields below.</i>")
         lines.append(f"╰──────────────────────────────────╯")
 
         return "\n".join(lines)

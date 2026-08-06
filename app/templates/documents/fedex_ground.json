@@ -1,32 +1,37 @@
 {
-  "id": "fedex_express",
-  "name": "FedEx Express",
+  "id": "fedex_ground",
+  "name": "FedEx Ground",
   "category": "fedex_shipping_label",
   "version": 1,
-  "priority": 90,
+  "priority": 95,
   "enabled": true,
   "required_keywords": [
     "FEDEX",
-    "EXPRESS"
+    "GROUND"
   ],
   "optional_keywords": [
-    "TRACKING",
-    "PRIORITY",
-    "OVERNIGHT",
-    "DELIVERY",
-    "TRK#"
+    "TRK#",
+    "COMMERCIAL POINT",
+    "CAD:",
+    "FROM:",
+    "TO",
+    "REF:",
+    "INV:",
+    "PO:",
+    "DEPT:"
   ],
   "excluded_keywords": [
-    "GROUND",
     "HOME DELIVERY",
     "RETURN",
+    "RMA:",
     "USPS",
     "UPS",
     "DHL"
   ],
   "regex_indicators": [
+    "\\bTRK#?\\s*\\d{4}\\s*\\d{4}\\s*\\d{4}\\b",
     "\\b\\d{12}\\b",
-    "\\b\\d{15}\\b"
+    "\\b9632\\s*0019\\b"
   ],
   "minimum_score": 0.70,
   "fields": {
@@ -36,17 +41,24 @@
     },
     "service": {
       "type": "constant",
-      "value": "FedEx Express"
+      "value": "FedEx Ground"
     },
     "tracking_number": {
       "type": "regex",
       "patterns": [
-        "\\b\\d{12}\\b",
-        "\\b\\d{15}\\b",
-        "\\b\\d{20}\\b"
+        "TRK#?\\s*(\\d{4}\\s*\\d{4}\\s*\\d{4})",
+        "\\b(\\d{12})\\b"
       ],
       "required": true,
       "normalize": "digits_only"
+    },
+    "recipient_name": {
+      "type": "anchored_text",
+      "anchor": "TO"
+    },
+    "recipient_address": {
+      "type": "anchored_block",
+      "anchor": "TO"
     }
   },
   "actions": [
