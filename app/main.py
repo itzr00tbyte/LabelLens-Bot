@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import os
+import signal
 import sys
 import warnings
 
@@ -66,7 +67,12 @@ def build_application() -> Application:
         logger.error("TELEGRAM_BOT_TOKEN is not set in environment!")
         sys.exit(1)
 
-    request = HTTPXRequest(connect_timeout=30.0, read_timeout=30.0)
+    request = HTTPXRequest(
+        connect_timeout=30.0,
+        read_timeout=60.0,
+        write_timeout=30.0,
+        pool_timeout=30.0,
+    )
     app = (
         Application.builder()
         .token(settings.TELEGRAM_BOT_TOKEN)
@@ -134,14 +140,18 @@ async def global_error_handler(update: object, context: ContextTypes.DEFAULT_TYP
 
 async def main() -> None:
     setup_logging()
-    from colorama import Fore, Style  # type: ignore[import-untyped]
-    print(
-        f"\n{Fore.CYAN}{Style.BRIGHT}"
-        "===========================================================\n"
-        "         🚀 LABELLENS TELEGRAM BOT INITIALIZING           \n"
-        "===========================================================\n"
-        f"{Style.RESET_ALL}"
-    )
+
+    # Only print colorama banner in non-production environments
+    if settings.ENVIRONMENT != "production":
+        from colorama import Fore, Style  # type: ignore[import-untyped]
+        print(
+            f"\n{Fore.CYAN}{Style.BRIGHT}"
+            "===========================================================\n"
+            "         🚀 LABELLENS TELEGRAM BOT INITIALIZING           \n"
+            "===========================================================\n"
+            f"{Style.RESET_ALL}"
+        )
+
     logger.info("Initializing database...")
     await init_db()
 
@@ -160,17 +170,26 @@ async def main() -> None:
     if application.updater:
         await application.updater.start_polling()
 
-    # Keep running until interrupted
+    # Keep running until SIGTERM / SIGINT / KeyboardInterrupt
     stop_event = asyncio.Event()
+
+    def _handle_signal(sig: int) -> None:
+        logger.info(f"Received signal {signal.Signals(sig).name}, shutting down...")
+        stop_event.set()
+
+    loop = asyncio.get_running_loop()
+    for sig in (signal.SIGTERM, signal.SIGINT):
+        loop.add_signal_handler(sig, _handle_signal, sig)
+
     try:
         await stop_event.wait()
-    except (KeyboardInterrupt, SystemExit):
-        logger.info("Stopping bot...")
     finally:
+        logger.info("Stopping bot...")
         if application.updater:
             await application.updater.stop()
         await application.stop()
         await application.shutdown()
+        logger.info("Bot stopped cleanly.")
 
 
 if __name__ == "__main__":

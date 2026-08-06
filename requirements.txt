@@ -1,3 +1,4 @@
+# Production dependencies only
 python-telegram-bot[job-queue]>=21.0
 sqlalchemy[asyncio]>=2.0.28
 aiosqlite>=0.20.0
@@ -10,7 +11,4 @@ Pillow>=10.2.0
 opencv-python-headless>=4.9.0.80
 python-dotenv>=1.0.1
 pyyaml>=6.0.1
-pytest>=8.1.1
-pytest-asyncio>=0.23.6
-pytest-cov>=5.0.0
 colorama>=0.4.6

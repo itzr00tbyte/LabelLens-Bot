@@ -1,5 +1,6 @@
 import logging
 import logging.handlers
+import os
 import sys
 from colorama import Fore, Style, init
 
@@ -80,10 +81,13 @@ def setup_logging() -> None:
 
     # ── Rotating file handler (plain text, always at DEBUG level) ───────────
     try:
+        log_dir = "logs"
+        os.makedirs(log_dir, exist_ok=True)
+        log_file = os.path.join(log_dir, "bot.log")
         file_handler = logging.handlers.RotatingFileHandler(
-            "bot.log",
+            log_file,
             maxBytes=5 * 1024 * 1024,  # 5 MB per file
-            backupCount=3,
+            backupCount=5,
             encoding="utf-8",
         )
         file_handler.setLevel(logging.DEBUG)

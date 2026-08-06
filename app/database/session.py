@@ -33,14 +33,17 @@ AsyncSessionLocal = async_sessionmaker(
 
 
 async def init_db() -> None:
+    """Initialize the database engine.
+
+    NOTE: Schema migrations are managed by Alembic. Run `alembic upgrade head`
+    before starting the bot. This function only enables SQLite pragmas.
+    """
     async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-        # Handle auto-migration for existing SQLite tables
-        try:
+        # Enable WAL journal mode for SQLite — safer concurrent async access
+        if settings.DATABASE_URL.startswith("sqlite"):
             from sqlalchemy import text
-            await conn.execute(text("ALTER TABLE users ADD COLUMN is_approved BOOLEAN DEFAULT 0"))
-        except Exception:
-            pass
+            await conn.execute(text("PRAGMA journal_mode=WAL"))
+            await conn.execute(text("PRAGMA synchronous=NORMAL"))
 
 
 @asynccontextmanager

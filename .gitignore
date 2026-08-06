@@ -23,6 +23,7 @@ bot.db
 # Logs & media
 *.log*
 logs/
+bot.log*
 
 # Dev scratch workspace
 scratch/

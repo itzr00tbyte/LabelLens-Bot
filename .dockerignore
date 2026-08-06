@@ -1,12 +1,42 @@
+# Git & VCS
 .git
+.gitignore
+
+# Virtual environment
 .venv
+
+# Python artifacts
 __pycache__
 *.pyc
 *.pyo
 *.pyd
+*.pyd
+
+# Testing
 .pytest_cache
 .coverage
 htmlcov
-bot.db
-*.log
+tests/
+requirements-dev.txt
+
+# Secrets & database
 .env
+bot.db
+*.sqlite
+*.sqlite3
+
+# Logs
+*.log
+logs/
+
+# Dev & docs (not needed in Docker image)
+scratch/
+Samples/
+docs/
+scripts/
+*.md
+*.bat
+
+# IDE
+.vscode
+.agents
