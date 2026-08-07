@@ -64,6 +64,10 @@ class SubmissionService:
             resized_image = ImageProcessingService.resize_max_dim(image)
             preprocessed_np = ImageProcessingService.preprocess_for_ocr(resized_image)
 
+            # Save processed image to disk
+            processed_path = ImageProcessingService.save_processed_image(preprocessed_np, submission_id)
+            submission.processed_image_path = processed_path
+
             # 2. Reading text
             if status_update_callback:
                 await status_update_callback("🔍 Reading text...")
@@ -82,7 +86,7 @@ class SubmissionService:
             if status_update_callback:
                 await status_update_callback("🧩 Matching template...")
 
-            match_res = self.matcher.match(ocr_res.text, ocr_res.confidence)
+            match_res = self.matcher.match(ocr_res.text, ocr_res.confidence, image=resized_image)
 
             # 4. Extracting fields
             if status_update_callback:
@@ -103,7 +107,6 @@ class SubmissionService:
                         extracted_fields=extracted
                     )
                     from dataclasses import asdict
-                    # Store compact scan: dimensions + field bboxes only (tokens omitted for DB size)
                     submission.spatial_scan_data = {
                         "dimensions": asdict(spatial_res.dimensions),
                         "total_tokens": spatial_res.total_tokens,

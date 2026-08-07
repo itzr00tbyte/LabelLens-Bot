@@ -156,10 +156,13 @@ class ReceiptImageGenerator:
         document_type: str,
         fields: Dict[str, Any],
         is_shipping: bool = False,
+        replacements: Optional[Dict[str, Image.Image]] = None,
+        image_regions: Optional[Dict[str, Any]] = None,
     ) -> Image.Image:
         """
         Generates a 100% high-resolution (800x1200) pixel-accurate receipt or shipping label image
         matching official carrier clone layouts (USPS, UPS, FedEx, or Store Receipt).
+        Includes logo/image region replacement and document integrity safeguard watermarking.
         """
         width = 800
         height = 1200
@@ -178,6 +181,15 @@ class ReceiptImageGenerator:
             ReceiptImageGenerator._draw_usps_label(draw, width, height, fields, document_type)
         else:
             ReceiptImageGenerator._draw_store_receipt(draw, width, height, fields, document_type)
+
+        # Apply replacement images (e.g. custom logo) if provided
+        if replacements and image_regions:
+            from app.services.image_replacement import ImageReplacementService
+            image = ImageReplacementService.overlay_replacements_on_canvas(image, image_regions, replacements)
+
+        # Apply document integrity safeguard watermark
+        from app.services.validation_service import ValidationService
+        image = ValidationService.apply_recreated_watermark(image)
 
         return image
 

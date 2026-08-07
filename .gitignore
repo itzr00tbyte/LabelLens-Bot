@@ -25,6 +25,9 @@ bot.db
 logs/
 bot.log*
 
+# Storage & runtime files
+storage/
+
 # Dev scratch workspace
 scratch/
 

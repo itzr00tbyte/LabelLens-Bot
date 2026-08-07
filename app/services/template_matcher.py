@@ -1,10 +1,13 @@
 from dataclasses import dataclass, field
 import re
 from typing import List, Optional, Tuple
+import cv2
+import numpy as np
+from PIL import Image
 
 from app.config import settings
-from app.templates.loader import TemplateLoader, default_template_loader
 from app.templates.schemas import TemplateDefinition
+from app.services.template_registry import template_registry, compute_phash
 
 
 @dataclass
@@ -17,20 +20,28 @@ class MatchResult:
 
 
 class TemplateMatcher:
-    def __init__(self, template_loader: Optional[TemplateLoader] = None):
-        self.loader = template_loader or default_template_loader
+    def __init__(self, template_loader: Optional[Any] = None):
+        self.loader = template_loader
 
-    def match(self, ocr_text: str, ocr_confidence: float = 1.0) -> MatchResult:
+    def match(
+        self,
+        ocr_text: str,
+        ocr_confidence: float = 1.0,
+        image: Optional[Image.Image] = None,
+    ) -> MatchResult:
         if not ocr_text or not ocr_text.strip():
             return MatchResult(template=None, score=0.0)
 
         normalized_text = ocr_text.upper()
-        templates = self.loader.list_templates()
+        if self.loader and hasattr(self.loader, "list_templates"):
+            templates = self.loader.list_templates()
+        else:
+            templates = template_registry.get_all_templates()
 
         scores: List[Tuple[TemplateDefinition, float, List[str], List[str]]] = []
 
         for tpl in templates:
-            score, matched, missing = self.score_template(tpl, normalized_text, ocr_confidence)
+            score, matched, missing = self.score_template(tpl, normalized_text, ocr_confidence, image)
             scores.append((tpl, score, matched, missing))
 
         # Sort by score descending then template priority
@@ -63,7 +74,11 @@ class TemplateMatcher:
         )
 
     def score_template(
-        self, tpl: TemplateDefinition, text_upper: str, ocr_confidence: float
+        self,
+        tpl: TemplateDefinition,
+        text_upper: str,
+        ocr_confidence: float,
+        image: Optional[Image.Image] = None,
     ) -> Tuple[float, List[str], List[str]]:
         matched_signals: List[str] = []
         missing_required: List[str] = []
@@ -77,7 +92,6 @@ class TemplateMatcher:
             else:
                 missing_required.append(f"required:{kw}")
 
-        # If missing required keywords, heavy penalty
         if tpl.required_keywords:
             req_coverage = req_matched / float(len(tpl.required_keywords))
         else:
@@ -89,14 +103,10 @@ class TemplateMatcher:
             req_penalty = 0.0
 
         # 2. Excluded keywords penalty
-        excluded_found = False
         for kw in tpl.excluded_keywords:
             if kw.upper() in text_upper:
-                excluded_found = True
                 matched_signals.append(f"excluded_penalty:{kw}")
-
-        if excluded_found:
-            return 0.0, matched_signals, missing_required
+                return 0.0, matched_signals, missing_required
 
         # 3. Optional keywords
         opt_matched = 0
@@ -119,12 +129,20 @@ class TemplateMatcher:
 
         regex_score = (regex_matched / float(len(tpl.regex_indicators))) if tpl.regex_indicators else 0.0
 
-        # Combine component scores weighted
-        # Required keyword score: 0.5, Regex indicators: 0.3, Optional keywords: 0.2
-        composite = (req_coverage * 0.50) + (regex_score * 0.30) + (opt_score * 0.20)
+        # 5. Aspect Ratio & Multi-modal Visual Match (if image available)
+        visual_boost = 0.0
+        if image and tpl.width and tpl.height:
+            w, h = image.size
+            img_ar = float(w) / float(h)
+            tpl_ar = float(tpl.width) / float(tpl.height)
+            if abs(img_ar - tpl_ar) < 0.15:
+                visual_boost += 0.10
+                matched_signals.append("aspect_ratio_match")
+
+        # Combine component scores
+        composite = (req_coverage * 0.45) + (regex_score * 0.25) + (opt_score * 0.20) + visual_boost
         composite = composite - req_penalty
 
-        # Multiply by OCR quality confidence scaling (min factor 0.85 to avoid over-penalty)
         ocr_factor = max(0.85, min(1.0, ocr_confidence))
         final_score = round(max(0.0, min(1.0, composite * ocr_factor)), 2)
 

@@ -27,6 +27,10 @@ class Settings(BaseSettings):
     LOG_LEVEL: str = "INFO"
     ENVIRONMENT: str = "development"
     TEMPLATES_DIR: str = "app/templates/documents"
+    SAMPLES_DIR: str = "/Users/snehithchalasani/Stuff/Reci-Edit-Bot/Samples"
+    WATERMARK_NON_OFFICIAL: bool = True
+    PDF_DPI: int = 300
+    STORAGE_DIR: str = "storage"
 
     @field_validator("ADMIN_TELEGRAM_IDS", mode="before")
     @classmethod
