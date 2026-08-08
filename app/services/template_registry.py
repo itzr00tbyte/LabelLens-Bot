@@ -40,11 +40,15 @@ class TemplateRegistry:
         Adding a new image to Samples/ automatically registers it without core code changes.
         """
         self._samples_templates.clear()
-        if not os.path.exists(self.samples_dir):
-            logger.warning(f"Samples directory '{self.samples_dir}' does not exist.")
-            return
+        target_dir = self.samples_dir
+        if not os.path.exists(target_dir):
+            if os.path.exists("Samples"):
+                target_dir = "Samples"
+            else:
+                logger.warning(f"Samples directory '{self.samples_dir}' does not exist.")
+                return
 
-        for root, dirs, files in os.walk(self.samples_dir):
+        for root, dirs, files in os.walk(target_dir):
             if "spatial_scans" in root:
                 continue
             for f in files:

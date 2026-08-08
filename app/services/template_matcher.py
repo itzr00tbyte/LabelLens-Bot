@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 import re
-from typing import List, Optional, Tuple
+from typing import Any, List, Optional, Tuple
 import cv2
 import numpy as np
 from PIL import Image
