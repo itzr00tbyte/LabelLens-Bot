@@ -2,7 +2,7 @@ import io
 import os
 import random
 import sys
-from typing import Any, Dict, Union
+from typing import Any, Dict, Optional, Union
 from PIL import Image, ImageDraw, ImageFont
 from PIL.ImageFont import FreeTypeFont
 
